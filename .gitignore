@@ -1,7 +1,7 @@
 /target
 /debug
 
-cargo.lock
+Cargo.lock
 
 *.pdb
 
