@@ -1,4 +1,5 @@
 mod app;
+pub mod project;
 
 use app::LaserStudioApp;
 

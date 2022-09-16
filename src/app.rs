@@ -1,14 +1,29 @@
+mod text;
+
 use eframe::egui;
 use egui::menu;
 
+use crate::project;
+
+#[derive(PartialEq)]
+enum Workspace {
+    Home,
+    Graphical,
+    Text,
+    Render
+}
+
 pub struct LaserStudioApp {
-   tab: u32 
+    tab: Workspace,
+    project: project::Project
+
 }
 
 impl Default for LaserStudioApp {
     fn default() -> Self {
         Self { 
-            tab: 0
+            tab: Workspace::Home,
+            project: project::Project::default()
         }
     }
 }
@@ -17,8 +32,13 @@ impl eframe::App for LaserStudioApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::TopBottomPanel::top("menu").show(ctx, |ui| {
             menu::bar(ui, |ui| {
-                ui.menu_button("File", |_ui| {
-                    
+                ui.menu_button("File", |ui| {
+                    if ui.button("New").clicked() {
+                        self.tab = Workspace::Graphical;
+                    }
+                    if ui.button("Open").clicked() {
+                        self.tab = Workspace::Graphical;
+                    }
                 });
 
                 ui.menu_button("Edit", |_ui| {
@@ -29,23 +49,24 @@ impl eframe::App for LaserStudioApp {
                     
                 });
                 ui.separator();
-                if self.tab == 0 {
+                if self.tab == Workspace::Home {
                     ui.label("Home");
                 } else {
-                    if ui.selectable_label(self.tab == 1, "Graphical").clicked() {
-                       self.tab = 1;
+                    if ui.selectable_label(self.tab == Workspace::Graphical, "Graphical").clicked() {
+                       self.tab = Workspace::Graphical;
                     }
-                    if ui.selectable_label(self.tab == 2, "Text").clicked() {
-                       self.tab = 2;
+                    if ui.selectable_label(self.tab == Workspace::Text, "Text").clicked() {
+                       self.tab = Workspace::Text;
                     } 
-                    if ui.selectable_label(self.tab == 3, "Render").clicked() {
-                       self.tab = 3; 
+                    if ui.selectable_label(self.tab == Workspace::Render, "Render").clicked() {
+                       self.tab = Workspace::Render; 
                     }
                 } 
             }); 
         });
 
         match self.tab {
+            Workspace::Text => text::update_text_workspace(ctx, self),
             _ => {
                 egui::SidePanel::left("about").resizable(false).min_width(200.0).show(ctx, |ui| {
                     ui.heading("Laser Studio");
@@ -55,6 +76,14 @@ impl eframe::App for LaserStudioApp {
                     ui.label("© 2020-2022 william341.");
                 });
                 egui::CentralPanel::default().show(ctx, |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("New").clicked() {
+                            self.tab = Workspace::Graphical;
+                        }
+                        if ui.button("Open").clicked() {
+                            self.tab = Workspace::Graphical;
+                        }
+                    });
                     ui.heading("Recent Projects");
                 });
             }
