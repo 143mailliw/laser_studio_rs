@@ -1,4 +1,5 @@
 mod text;
+mod graphical;
 
 use eframe::egui;
 use egui::menu;
@@ -67,6 +68,7 @@ impl eframe::App for LaserStudioApp {
 
         match self.tab {
             Workspace::Text => text::update_text_workspace(ctx, self),
+            Workspace::Graphical => graphical::update_graphical_workspace(ctx, self),
             _ => {
                 egui::SidePanel::left("about").resizable(false).min_width(200.0).show(ctx, |ui| {
                     ui.heading("Laser Studio");
