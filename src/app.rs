@@ -3,6 +3,7 @@ mod graphical;
 
 use eframe::egui;
 use egui::menu;
+use tracing::info;
 
 use crate::project;
 
@@ -43,48 +44,95 @@ impl eframe::App for LaserStudioApp {
 
         egui::TopBottomPanel::top("menu").frame(frame).show(ctx, |ui| {
             menu::bar(ui, |ui| {
-                ui.style_mut().spacing.button_padding.x = 8.0;
-                ui.style_mut().spacing.button_padding.y = 6.0;
-                ui.style_mut().spacing.item_spacing.x = 0.0;
-                ui.style_mut().spacing.item_spacing.y = 0.0;
-                ui.style_mut().visuals.widgets.active.rounding = egui::Rounding::none();
-                ui.style_mut().visuals.widgets.hovered.rounding = egui::Rounding::none();
-                ui.style_mut().visuals.widgets.inactive.rounding = egui::Rounding::none();
+                ui.spacing_mut().button_padding = egui::vec2(8.0, 6.0);
+                ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
+                ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
+                ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
 
                 ui.menu_button("File", |ui| {
+                    ui.spacing_mut().button_padding = egui::vec2(8.0, 4.0);
+                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                    ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
+                    ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
+                    ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
+
                     if ui.button("New").clicked() {
+                        self.project = project::Project::default();
                         self.tab = Workspace::Graphical;
                     }
                     if ui.button("Open").clicked() {
                         self.tab = Workspace::Graphical;
                     }
+
+                    if self.tab != Workspace::Home {
+                        ui.separator();
+                        if ui.button("Save").clicked() {}
+                        if ui.button("Save As").clicked() {}
+                        if ui.button("Export").clicked() {}
+                    }
+
+                    ui.separator();
+                    if ui.button("Exit").clicked() {
+                        info!("File -> Exit pressed, exiting...");
+                        std::process::exit(0);
+                    }
                 });
 
-                ui.menu_button("Edit", |_ui| {
+                if self.tab != Workspace::Home {
+                    ui.menu_button("Edit", |ui| {
+                        ui.spacing_mut().button_padding = egui::vec2(8.0, 4.0);
+                        ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                        ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
+                        ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
+                        ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
 
-                });
+                        if ui.button("Undo").clicked() {}
+                        if ui.button("Redo").clicked() {}
+                        if ui.button("History").clicked() {}
+                        ui.separator();
+                        if ui.button("Find/Replace").clicked() {}
+                        ui.separator();
+                        if ui.button("Preferences").clicked() {}
+                    });
+                }
 
-                ui.menu_button("Run", |_ui| {
-                    
-                });
+                if self.tab != Workspace::Home {
+                    ui.menu_button("Run", |ui| {
+                        ui.spacing_mut().button_padding = egui::vec2(8.0, 4.0);
+                        ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                        ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
+                        ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
+                        ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
 
-                ui.style_mut().spacing.item_spacing.x = 3.0;
+                        if ui.button("Run").clicked() {}
+                        if ui.button("Debug").clicked() {}
+                        ui.separator();
+                        if ui.button("Pause").clicked() {}
+                        if ui.button("Step Forwards").clicked() {}
+                        if ui.button("Step Backwards").clicked() {}
+                        ui.separator();
+                        if ui.button("Stop").clicked() {}
+                    });
+                }
+
+                ui.spacing_mut().item_spacing.x = 3.0;
 
                 ui.separator();
     
-                ui.style_mut().spacing.button_padding.x = 5.0;
-                ui.style_mut().spacing.button_padding.y = 3.0;
-                ui.style_mut().spacing.item_spacing.x = 3.0;
-                ui.style_mut().spacing.item_spacing.y = 3.0;
+                ui.spacing_mut().button_padding.x = 5.0;
+                ui.spacing_mut().button_padding.y = 3.0;
+                ui.spacing_mut().item_spacing.x = 3.0;
+                ui.spacing_mut().item_spacing.y = 3.0;
 
                 let tab_radius = egui::Rounding {ne: 2.0, se: 2.0, nw: 2.0, sw: 2.0};
 
-                ui.style_mut().visuals.widgets.active.rounding = tab_radius;
-                ui.style_mut().visuals.widgets.hovered.rounding = tab_radius;
-                ui.style_mut().visuals.widgets.inactive.rounding = tab_radius;
+                ui.visuals_mut().widgets.active.rounding = tab_radius;
+                ui.visuals_mut().widgets.hovered.rounding = tab_radius;
+                ui.visuals_mut().widgets.inactive.rounding = tab_radius;
 
                 if self.tab == Workspace::Home {
-                    ui.style_mut().spacing.item_spacing.y = 6.0;
+                    ui.spacing_mut().item_spacing.y = 6.0;
                     ui.label("Home");
                 } else {
                     if ui.selectable_label(self.tab == Workspace::Graphical, "Graphical").clicked() {
@@ -114,6 +162,7 @@ impl eframe::App for LaserStudioApp {
                 egui::CentralPanel::default().show(ctx, |ui| {
                     ui.horizontal(|ui| {
                         if ui.button("New").clicked() {
+                            self.project = project::Project::default();
                             self.tab = Workspace::Graphical;
                         }
                         if ui.button("Open").clicked() {
