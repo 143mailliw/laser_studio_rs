@@ -1,5 +1,6 @@
 mod app;
 pub mod project;
+pub mod parser;
 
 use app::LaserStudioApp;
 
