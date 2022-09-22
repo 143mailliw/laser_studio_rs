@@ -18,7 +18,8 @@ enum Workspace {
 pub struct LaserStudioApp {
     tab: Workspace,
     project: project::Project,
-    graphical: graphical::GraphicalWorkspaceState
+    graphical: graphical::GraphicalWorkspaceState,
+    text: text::TextWorkspace
 }
 
 impl Default for LaserStudioApp {
@@ -26,7 +27,8 @@ impl Default for LaserStudioApp {
         Self { 
             tab: Workspace::Home,
             project: project::Project::default(),
-            graphical: graphical::GraphicalWorkspaceState::default()
+            graphical: graphical::GraphicalWorkspaceState::default(),
+            text: text::TextWorkspace::default()
         }
     }
 }
