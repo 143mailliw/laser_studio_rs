@@ -23,7 +23,7 @@ pub enum Expr {
     Equal(Box<Expr>, Box<Expr>),
     And(Box<Expr>, Box<Expr>),
     Or(Box<Expr>, Box<Expr>),
-    Not(Box<Expr>, Box<Expr>),
+    Not(Box<Expr>),
 
     // Function Call
     Call(String, Vec<Expr>)
@@ -53,11 +53,13 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .or(indirect_value);
 
         let op = |c| just(c).padded();
+        let dc_op = |c, c2| just(c).then(just(c2)).padded();
 
-        let unary = op('-')
+        let unary = op('-').to(Expr::Negate as fn(_) -> _)
+            .or(op('!').to(Expr::Not as fn(_) -> _))
             .repeated()
             .then(atom)
-            .foldr(|_op, right| Expr::Negate(Box::new(right)));
+            .foldr(|op, right| op(Box::new(right)));
 
         let binary_first = unary.clone()
             .then(op('^').to(Expr::Exponent as fn(_, _) -> _)
@@ -80,7 +82,25 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
                 .repeated())
             .foldl(|left, (op, right)| op(Box::new(left), Box::new(right)));
 
-        binary_third
+        let logical_first = binary_third.clone()
+            .then(op('<').to(Expr::LessThan as fn(_, _) -> _)
+                .or(op('>').to(Expr::GreaterThan as fn(_, _) -> _))
+                .or(dc_op('<', '=').to(Expr::LessThanOrEqual as fn(_, _) -> _))
+                .or(dc_op('>', '=').to(Expr::GreaterThanOrEqual as fn(_, _) -> _))
+                .or(dc_op('=', '=').to(Expr::Equal as fn(_, _) -> _))
+                .then(binary_third)
+                .repeated())
+            .foldl(|left, (op, right)| op(Box::new(left), Box::new(right)));
+
+        let logical_last = logical_first.clone()
+            .then(op('&').to(Expr::And as fn(_, _) -> _)
+                .or(op('|').to(Expr::Or as fn(_, _) -> _))
+                .then(logical_first)
+                .repeated())
+            .foldl(|left, (op, right)| op(Box::new(left), Box::new(right)));
+
+
+        logical_last
     });
 
     let variable = text::ident()
@@ -95,7 +115,7 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             expression: right
         });
 
-    // TODO: fix this erroring on EOL if and ONLY if Tower doesn't
+    // TODO: fix this erroring on EOL
     let comment = just::<_, _, Simple<char>>('#')
         .then(take_until(just('\n')))
         .padded()
