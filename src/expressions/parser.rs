@@ -1,38 +1,53 @@
 use chumsky::prelude::*;
 
+
+pub type Span = std::ops::Range<usize>;
+pub type Spanned<T> = (T, Span);
+
+#[derive(Debug, Clone)]
+pub enum BinaryOperation {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Exponent,
+    Modulo,
+
+    LessThan,
+    GreaterThan,
+    LessThanOrEqual,
+    GreaterThanOrEqual,
+    Equal,
+    And,
+    Or
+}
+
+#[derive(Debug, Clone)]
+pub enum UnaryOperation {
+    Negate,
+    Not
+}
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     // Data Types
     Number(f64),
     Variable(String),
+    Group(Spanned<Box<Expr>>),
 
-    // Operators (Math)
-    Add(Box<Expr>, Box<Expr>),
-    Subtract(Box<Expr>, Box<Expr>),
-    Multiply(Box<Expr>, Box<Expr>),
-    Divide(Box<Expr>, Box<Expr>),
-    Exponent(Box<Expr>, Box<Expr>),
-    Modulo(Box<Expr>, Box<Expr>),
-    Negate(Box<Expr>),
-
-    // Operators (Logical)
-    LessThan(Box<Expr>, Box<Expr>),
-    GreaterThan(Box<Expr>, Box<Expr>),
-    LessThanOrEqual(Box<Expr>, Box<Expr>),
-    GreaterThanOrEqual(Box<Expr>, Box<Expr>),
-    Equal(Box<Expr>, Box<Expr>),
-    And(Box<Expr>, Box<Expr>),
-    Or(Box<Expr>, Box<Expr>),
-    Not(Box<Expr>),
+    // Expressions
+    BinaryExpression(Spanned<Box<Expr>>, BinaryOperation, Spanned<Box<Expr>>),
+    UnaryExpression(UnaryOperation, Spanned<Box<Expr>>),
 
     // Function Call
-    Call(String, Vec<Expr>)
+    Call(String, Vec<Spanned<Box<Expr>>>)
 }
 
 #[derive(Debug, Clone)]
 pub struct Assignment {
     pub name: String,
-    pub expression: Expr
+    pub expression: Spanned<Box<Expr>>,
+    pub span: Span
 }
 
 pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
@@ -44,61 +59,89 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .chain::<char, _, _>(just('.').chain(text::digits(10)).or_not().flatten())
             .collect::<String>()
             .map(|s: String| Expr::Number(s.parse().unwrap()))
-            .padded();
+            .padded()
+            .map_with_span(|expr, span: Span| (expr, span));
 
-        let indirect_value = expr.delimited_by(just('('), just(')'))
-            .or(ident.map(Expr::Variable));
+        let variable_reference = ident
+            .map(Expr::Variable)
+            .map_with_span(|expr, span: Span| (expr, span));
+
+        // delimiters weren't working here for some weird reason
+        let group = just('(')
+            .padded()
+            .ignore_then(expr.clone())
+            .padded()
+            .then_ignore(just(')'))
+            .padded()
+            .map(|expr: Spanned<Expr>| Expr::Group((Box::new(expr.0), expr.1)))
+            .map_with_span(|expr, span: Span| (expr, span));
+
+        let call = ident
+            .then_ignore(just('('))
+            .padded()
+            .then(expr.clone().separated_by(just(",")))
+            .then_ignore(just(')'))
+            .map(|(ident, vec)| Expr::Call(ident, vec.iter().map(|spanned| (Box::new(spanned.0.clone()), spanned.1.clone())).collect()))
+            .map_with_span(|expr, span: Span| (expr, span));
 
         let atom = num
-            .or(indirect_value);
+            .or(call)
+            .or(group)
+            .or(variable_reference);
 
         let op = |c| just(c).padded();
         let dc_op = |c, c2| just(c).then(just(c2)).padded();
-
-        let unary = op('-').to(Expr::Negate as fn(_) -> _)
-            .or(op('!').to(Expr::Not as fn(_) -> _))
+ 
+        let unary = op('-').to(UnaryOperation::Negate)
+            .or(op('!').to(UnaryOperation::Not))
+            .map_with_span(|expr, span: Span| (expr, span))
             .repeated()
             .then(atom)
-            .foldr(|op, right| op(Box::new(right)));
+            .foldr(|op, right| (Expr::UnaryExpression(op.0, (Box::new(right.0), right.1.clone())), op.1.start..right.1.end));
+
 
         let binary_first = unary.clone()
-            .then(op('^').to(Expr::Exponent as fn(_, _) -> _)
+            .then(op('^').to(BinaryOperation::Exponent)
                 .then(unary)
+                .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
-            .foldl(|left, (op, right)| op(Box::new(left), Box::new(right)));
+            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
 
         let binary_second = binary_first.clone()
-            .then(op('*').to(Expr::Multiply as fn(_, _) -> _)
-                .or(op('/').to(Expr::Divide as fn(_, _) -> _))
-                .or(op('%').to(Expr::Multiply as fn(_, _) -> _))
-                .then(binary_first)
+            .then(op('*').to(BinaryOperation::Multiply)
+                .or(op('/').to(BinaryOperation::Divide))
+                .or(op('%').to(BinaryOperation::Modulo))
+                .then(binary_first) 
+                .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
-            .foldl(|left, (op, right)| op(Box::new(left), Box::new(right)));
+            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
 
         let binary_third = binary_second.clone()
-            .then(op('+').to(Expr::Add as fn(_, _) -> _)
-                .or(op('-').to(Expr::Subtract as fn(_, _) -> _))
+            .then(op('+').to(BinaryOperation::Add)
+                .or(op('-').to(BinaryOperation::Subtract))
                 .then(binary_second)
+                .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
-            .foldl(|left, (op, right)| op(Box::new(left), Box::new(right)));
+            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
 
         let logical_first = binary_third.clone()
-            .then(op('<').to(Expr::LessThan as fn(_, _) -> _)
-                .or(op('>').to(Expr::GreaterThan as fn(_, _) -> _))
-                .or(dc_op('<', '=').to(Expr::LessThanOrEqual as fn(_, _) -> _))
-                .or(dc_op('>', '=').to(Expr::GreaterThanOrEqual as fn(_, _) -> _))
-                .or(dc_op('=', '=').to(Expr::Equal as fn(_, _) -> _))
+            .then(op('<').to(BinaryOperation::LessThan)
+                .or(op('>').to(BinaryOperation::GreaterThan))
+                .or(dc_op('<', '=').to(BinaryOperation::LessThanOrEqual))
+                .or(dc_op('>', '=').to(BinaryOperation::GreaterThanOrEqual))
+                .or(dc_op('=', '=').to(BinaryOperation::Equal))
                 .then(binary_third)
+                .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
-            .foldl(|left, (op, right)| op(Box::new(left), Box::new(right)));
+            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
 
         let logical_last = logical_first.clone()
-            .then(op('&').to(Expr::And as fn(_, _) -> _)
-                .or(op('|').to(Expr::Or as fn(_, _) -> _))
+            .then(op('&').to(BinaryOperation::And)
+                .or(op('|').to(BinaryOperation::Or))
                 .then(logical_first)
+                .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
-            .foldl(|left, (op, right)| op(Box::new(left), Box::new(right)));
-
+            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
 
         logical_last
     });
@@ -110,9 +153,11 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
         .then_ignore(just('='))
         .then(expr.clone())
         .then_ignore(just(';'))
-        .map(|(name, right)| Assignment {
+        .map_with_span(|expr, span: Span| (expr, span))
+        .map(|((name, right), span)| Assignment {
             name,
-            expression: right
+            expression: (Box::new(right.0), right.1),
+            span
         });
 
     // TODO: fix this erroring on EOL

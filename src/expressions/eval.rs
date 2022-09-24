@@ -1,24 +1,54 @@
 use super::parser::Expr;
+use super::parser::BinaryOperation;
+use super::parser::UnaryOperation;
+use super::parser::Spanned;
 use super::parser::Assignment;
 use super::errors::Error;
 use super::errors::ErrorType;
 use std::collections::HashMap;
 
-fn eval(expr: &Expr, variables: &mut HashMap<String, f64>) -> Result<f64, String> {
-    match expr {
-        Expr::Number(x) => Ok(*x),
-        Expr::Negate(a) => Ok(-eval(a, variables)?),
-        Expr::Add(a, b) => Ok(eval(a, variables)? + eval(b, variables)?),
-        Expr::Subtract(a, b) => Ok(eval(a, variables)? - eval(b, variables)?),
-        Expr::Multiply(a, b) => Ok(eval(a, variables)? * eval(b, variables)?),
-        Expr::Divide(a, b) => Ok(eval(a, variables)? / eval(b, variables)?),
-        Expr::Modulo(a, b) => Ok(eval(a, variables)? / eval(b, variables)?),
-        Expr::Exponent(a, b) => Ok(f64::powf(eval(a, variables)?, eval(b, variables)?)),
-        Expr::Variable(name) => if let val = variables.get(name) {
-            Ok(*val.unwrap())
-        } else {
-            Err(format!("Cannot find variable `{}`. Are you using it too early?", name))
+fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut HashMap<String, f64>) -> Result<f64, String> {
+    let expr = spanned_expr.0.clone();
+    let _span = spanned_expr.1.clone();
+
+    match *expr {
+        Expr::Number(x) => Ok(x),
+        Expr::Group(x) => Ok(eval(&x, variables)?),
+        Expr::UnaryExpression(op, a) => {
+            match op {
+                UnaryOperation::Negate => Ok(-eval(&a, variables)?),
+                UnaryOperation::Not => Ok(if eval(&a, variables)? >= 1.0 {0.0} else {1.0})
+            }
         },
+        Expr::BinaryExpression(a, op, b) => {
+            match op {
+                // Mathematical Operations
+                BinaryOperation::Add => Ok(eval(&a, variables)? + eval(&b, variables)?),
+                BinaryOperation::Subtract => Ok(eval(&a, variables)? - eval(&b, variables)?),
+                BinaryOperation::Multiply => Ok(eval(&a, variables)? * eval(&b, variables)?),
+                BinaryOperation::Divide => Ok(eval(&a, variables)? / eval(&b, variables)?),
+                BinaryOperation::Modulo => Ok(eval(&a, variables)? / eval(&b, variables)?),
+                BinaryOperation::Exponent => Ok(f64::powf(eval(&a, variables)?, eval(&b, variables)?)),
+
+                // Logical Operations
+                BinaryOperation::LessThan => Ok((eval(&a, variables)? < eval(&b, variables)?) as u64 as f64),
+                BinaryOperation::GreaterThan => Ok((eval(&a, variables)? > eval(&b, variables)?) as u64 as f64),
+                BinaryOperation::LessThanOrEqual => Ok((eval(&a, variables)? <= eval(&b, variables)?) as u64 as f64),
+                BinaryOperation::GreaterThanOrEqual => Ok((eval(&a, variables)? >= eval(&b, variables)?) as u64 as f64),
+                BinaryOperation::Equal => Ok((eval(&a, variables)? == eval(&b, variables)?) as u64 as f64),
+                BinaryOperation::And => Ok((eval(&a, variables)? >= 1.0 && eval(&a, variables)? >= 1.0) as u64 as f64),
+                BinaryOperation::Or => Ok((eval(&a, variables)? >= 1.0 || eval(&a, variables)? >= 1.0) as u64 as f64),
+            }
+        },
+        Expr::Variable(name) => {
+            let result = variables.get(&name);
+
+            match result {
+                Some(value) => Ok(*value),
+                None => Err(format!("Cannot find variable `{}`. Are you using it too early?", name))
+
+            }
+        }
         _ => todo!()
     }
 }
