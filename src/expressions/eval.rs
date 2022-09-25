@@ -2,14 +2,21 @@ use super::parser::Expr;
 use super::parser::BinaryOperation;
 use super::parser::UnaryOperation;
 use super::parser::Spanned;
+use super::parser::Span;
 use super::parser::Assignment;
 use super::errors::Error;
 use super::errors::ErrorType;
 use std::collections::HashMap;
+use rand::Rng;
 
-fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut HashMap<String, f64>) -> Result<f64, String> {
+pub struct RawEvalError {
+    error: String,
+    span: Span
+}
+
+fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut HashMap<String, f64>) -> Result<f64, RawEvalError> {
     let expr = spanned_expr.0.clone();
-    let _span = spanned_expr.1.clone();
+    let span = spanned_expr.1.clone();
 
     match *expr {
         Expr::Number(x) => Ok(x),
@@ -45,11 +52,68 @@ fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut HashMap<String, f64>)
 
             match result {
                 Some(value) => Ok(*value),
-                None => Err(format!("Cannot find variable `{}`. Are you using it too early?", name))
+                None => Err(RawEvalError { 
+                    error: format!("Cannot find variable '{name}'. Are you using it too early?"),
+                    span
+                })
 
             }
+        },
+        Expr::Call(func, args) => {
+            let arguments_results = args
+                .iter()
+                .map(|a| eval(&a, variables))
+                .collect::<Result<Vec<f64>, RawEvalError>>();
+
+            let arguments = match arguments_results {
+                Ok(args) => args,
+                Err(error) => return Err(error)
+            };
+
+            match func.as_str() {
+                "sin" => function("sin", 1, |args| f64::sin(args[0]), span, arguments),
+                "cos" => function("cos", 1, |args| f64::cos(args[0]), span, arguments),
+                "tan" => function("tan", 1, |args| f64::tan(args[0]), span, arguments),
+                "asin" => function("asin", 1, |args| f64::asin(args[0]), span, arguments),
+                "acos" => function("acos", 1, |args| f64::acos(args[0]), span, arguments),
+                "atan" => function("atan", 1, |args| f64::atan(args[0]), span, arguments),
+                "atan2" => function("atan2", 2, |args| f64::atan2(args[0], args[1]), span, arguments),
+                "sqrt" => function("sqrt", 1, |args| f64::sqrt(args[0]), span, arguments),
+                "min" => function("min", 2, |args| f64::min(args[0], args[1]), span, arguments),
+                "max" => function("max", 2, |args| f64::max(args[0], args[1]), span, arguments),
+                "floor" => function("floor", 1, |args| f64::floor(args[0]), span, arguments),
+                "ceil" => function("ceil", 1, |args| f64::ceil(args[0]), span, arguments),
+                "round" => function("round", 1, |args| f64::round(args[0]), span, arguments),
+                "abs" => function("abs", 1, |args| f64::abs(args[0]), span, arguments),
+                "rand" => function("rand", 0, |_args| {
+                    let mut rng = rand::thread_rng();
+                    
+                    rng.gen::<f64>()
+                }, span, arguments),
+                "if" => function("if", 3, |args| if args[0] >= 1.0 {args[1]} else {args[2]}, span, arguments),
+                // formula for this is from the steam guide
+                "lerp" => function("lerp", 3, |args| (args[1] * args[0] + args[2] * (1.0 - args[0])), span, arguments),
+                _ => return Err(RawEvalError {
+                    error: format!("No such function '{func}'."), 
+                    span
+                })
+            }
         }
-        _ => todo!()
+    }
+}
+
+fn function(name: &str, exp_count: u8, c: impl Fn(Vec<f64>) -> f64, span: Span, arguments: Vec<f64>) -> Result<f64, RawEvalError> {
+    if arguments.len() == exp_count.into() {
+        Ok(c(arguments))
+    } else {
+        let actual_count = arguments.len();
+        let exp_count_text = if exp_count == 1 {"argument"} else {"arguments"};
+        let actual_count_text = if actual_count == 1 {"argument"} else {"arguments"};
+
+        Err(RawEvalError {
+            error: format!("Function '{name}' expected {exp_count} {exp_count_text}, but only got {actual_count} {actual_count_text}."),
+            span
+        })
     }
 }
 
@@ -62,7 +126,7 @@ pub fn run(assignments: Vec<Assignment>) -> (HashMap<String, f64>, Vec<Error>) {
         
         match eval_result {
             Ok(value) => { variables.insert(assignment.name, value); },
-            Err(error) => { errors.push(Error { line_number: 0, col_number: 0, reason: error, error_type: ErrorType::EvaluationError }); }
+            Err(error) => { errors.push(Error { line_number: 0, col_number: 0, reason: error.error, error_type: ErrorType::EvaluationError }); }
         }
     };
     
