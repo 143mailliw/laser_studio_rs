@@ -4,8 +4,7 @@ use super::parser::UnaryOperation;
 use super::parser::Spanned;
 use super::parser::Span;
 use super::parser::Assignment;
-use super::errors::Error;
-use super::errors::ErrorType;
+use super::errors::*;
 use std::collections::HashMap;
 use rand::Rng;
 
@@ -117,16 +116,25 @@ fn function(name: &str, exp_count: u8, c: impl Fn(Vec<f64>) -> f64, span: Span, 
     }
 }
 
-pub fn run(assignments: Vec<Assignment>) -> (HashMap<String, f64>, Vec<Error>) {
+pub fn run(assignments: Vec<Assignment>, text: String) -> (HashMap<String, f64>, Vec<Error>) {
     let mut variables: HashMap<String, f64> = HashMap::new();
     let mut errors: Vec<Error> = vec!();
 
     for assignment in assignments {
         let eval_result = eval(&assignment.expression, &mut variables);
-        
+
         match eval_result {
             Ok(value) => { variables.insert(assignment.name, value); },
-            Err(error) => { errors.push(Error { line_number: 0, col_number: 0, reason: error.error, error_type: ErrorType::EvaluationError }); }
+            Err(error) => {
+                let loc = get_position_from_span(error.span, text.clone());
+
+                errors.push(Error {
+                    line_number: loc.0,
+                    col_number: loc.1,
+                    reason: error.error,
+                    error_type: ErrorType::EvaluationError
+                });
+            }
         }
     };
     
