@@ -36,10 +36,12 @@ pub fn update_text_workspace(ctx: &egui::Context, app: &mut super::LaserStudioAp
             egui::TextEdit::multiline(&mut app.project.text_data.content).desired_width(f32::INFINITY).ui(ui);
 
             if ui.button("Run").clicked() {
-    app.text.parser_result = match parser::parser().parse(app.project.text_data.content.clone()) {
+                app.text.parser_result = match parser::parser().parse(app.project.text_data.content.clone()) {
                     Ok(value) => value,
                     Err(error) => panic!("Error parsing: {:?}", error)
-    };
+                };
+
+                println!("{:?}", app.text.parser_result);
 
                 let vec = app.text.parser_result.to_vec();
 

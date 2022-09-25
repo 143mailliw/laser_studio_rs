@@ -42,8 +42,8 @@ fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut HashMap<String, f64>)
                 BinaryOperation::LessThanOrEqual => Ok((eval(&a, variables)? <= eval(&b, variables)?) as u64 as f64),
                 BinaryOperation::GreaterThanOrEqual => Ok((eval(&a, variables)? >= eval(&b, variables)?) as u64 as f64),
                 BinaryOperation::Equal => Ok((eval(&a, variables)? == eval(&b, variables)?) as u64 as f64),
-                BinaryOperation::And => Ok((eval(&a, variables)? >= 1.0 && eval(&a, variables)? >= 1.0) as u64 as f64),
-                BinaryOperation::Or => Ok((eval(&a, variables)? >= 1.0 || eval(&a, variables)? >= 1.0) as u64 as f64),
+                BinaryOperation::And => Ok((eval(&a, variables)? >= 1.0 && eval(&b, variables)? >= 1.0) as u64 as f64),
+                BinaryOperation::Or => Ok((eval(&a, variables)? >= 1.0 || eval(&b, variables)? >= 1.0) as u64 as f64),
             }
         },
         Expr::Variable(name) => {
