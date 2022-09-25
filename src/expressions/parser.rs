@@ -52,6 +52,8 @@ pub struct Assignment {
 
 pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
     let ident = text::ident()
+        .chain::<char, _, _>(just('\'').or_not())
+        .collect::<String>()
         .padded();
 
     let expr = recursive(|expr| {
@@ -146,9 +148,7 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
         logical_last
     });
 
-    let variable = text::ident()
-        .chain::<char, _, _>(just('\'').or_not())
-        .collect::<String>()
+    let variable = ident
         .padded()
         .then_ignore(just('='))
         .then(expr.clone())

@@ -1,5 +1,6 @@
 mod text;
 mod graphical;
+mod render;
 
 use eframe::egui;
 use egui::menu;
@@ -19,7 +20,8 @@ pub struct LaserStudioApp {
     tab: Workspace,
     project: project::Project,
     graphical: graphical::GraphicalWorkspaceState,
-    text: text::TextWorkspace
+    pub text: text::TextWorkspace,
+    render: render::RenderWorkspace,
 }
 
 impl Default for LaserStudioApp {
@@ -28,7 +30,8 @@ impl Default for LaserStudioApp {
             tab: Workspace::Home,
             project: project::Project::default(),
             graphical: graphical::GraphicalWorkspaceState::default(),
-            text: text::TextWorkspace::default()
+            text: text::TextWorkspace::default(),
+            render: render::RenderWorkspace::default()
         }
     }
 }
@@ -138,13 +141,14 @@ impl eframe::App for LaserStudioApp {
                     ui.label("Home");
                 } else {
                     if ui.selectable_label(self.tab == Workspace::Graphical, "Graphical").clicked() {
-                       self.tab = Workspace::Graphical;
+                        self.tab = Workspace::Graphical;
                     }
                     if ui.selectable_label(self.tab == Workspace::Text, "Text").clicked() {
-                       self.tab = Workspace::Text;
+                        self.tab = Workspace::Text;
                     } 
                     if ui.selectable_label(self.tab == Workspace::Render, "Render").clicked() {
-                       self.tab = Workspace::Render; 
+                        render::on_switch_render(self);
+                        self.tab = Workspace::Render; 
                     }
                 } 
             }); 
@@ -153,6 +157,7 @@ impl eframe::App for LaserStudioApp {
         match self.tab {
             Workspace::Text => text::update_text_workspace(ctx, self),
             Workspace::Graphical => graphical::update_graphical_workspace(ctx, self),
+            Workspace::Render => render::update_render_workspace(ctx, self),
             _ => {
                 egui::SidePanel::left("about").resizable(false).min_width(200.0).show(ctx, |ui| {
                     ui.heading("Laser Studio");

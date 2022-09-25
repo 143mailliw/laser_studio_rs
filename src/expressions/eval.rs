@@ -75,7 +75,7 @@ fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut HashMap<String, f64>)
                 "tan" => function("tan", 1, |args| f64::tan(args[0]), span, arguments),
                 "asin" => function("asin", 1, |args| f64::asin(args[0]), span, arguments),
                 "acos" => function("acos", 1, |args| f64::acos(args[0]), span, arguments),
-                "atan" => function("atan", 1, |args| f64::atan(args[0]), span, arguments),
+            "atan" => function("atan", 1, |args| f64::atan(args[0]), span, arguments),
                 "atan2" => function("atan2", 2, |args| f64::atan2(args[0], args[1]), span, arguments),
                 "sqrt" => function("sqrt", 1, |args| f64::sqrt(args[0]), span, arguments),
                 "min" => function("min", 2, |args| f64::min(args[0], args[1]), span, arguments),
@@ -116,12 +116,11 @@ fn function(name: &str, exp_count: u8, c: impl Fn(Vec<f64>) -> f64, span: Span, 
     }
 }
 
-pub fn run(assignments: Vec<Assignment>, text: String) -> (HashMap<String, f64>, Vec<Error>) {
-    let mut variables: HashMap<String, f64> = HashMap::new();
+pub fn run(assignments: Vec<Assignment>, text: String, variables: &mut HashMap<String, f64>) -> (&mut HashMap<String, f64>, Vec<Error>) {
     let mut errors: Vec<Error> = vec!();
 
     for assignment in assignments {
-        let eval_result = eval(&assignment.expression, &mut variables);
+        let eval_result = eval(&assignment.expression, variables);
 
         match eval_result {
             Ok(value) => { variables.insert(assignment.name, value); },

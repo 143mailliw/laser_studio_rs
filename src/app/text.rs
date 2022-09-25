@@ -36,21 +36,21 @@ pub fn update_text_workspace(ctx: &egui::Context, app: &mut super::LaserStudioAp
             egui::TextEdit::multiline(&mut app.project.text_data.content).desired_width(f32::INFINITY).ui(ui);
 
             if ui.button("Run").clicked() {
-                app.text.parser_result = match parser::parser().parse(app.project.text_data.content.clone()) {
+    app.text.parser_result = match parser::parser().parse(app.project.text_data.content.clone()) {
                     Ok(value) => value,
                     Err(error) => panic!("Error parsing: {:?}", error)
-                };
+    };
 
                 let vec = app.text.parser_result.to_vec();
 
                 let now = Instant::now();
 
-                let evaluation_result = eval::run(vec, app.project.text_data.content.clone());
+                app.text.interpreter_variables = HashMap::new();
+                let evaluation_result = eval::run(vec, app.project.text_data.content.clone(), &mut app.text.interpreter_variables);
 
                 let elapsed = now.elapsed();
 
                 app.text.time = elapsed.as_secs_f64();
-                app.text.interpreter_variables = evaluation_result.0;
                 app.text.errors = evaluation_result.1;
             }
 
@@ -64,7 +64,7 @@ pub fn update_text_workspace(ctx: &egui::Context, app: &mut super::LaserStudioAp
 
                 let now = Instant::now();
 
-                app.project.graphical_data.points.par_iter().for_each(|_x| {eval::run(vec.clone(), app.project.text_data.content.clone());});
+                app.project.graphical_data.points.par_iter().for_each(|_x| {eval::run(vec.clone(), app.project.text_data.content.clone(), &mut HashMap::new());});
 
                 let elapsed = now.elapsed();
 

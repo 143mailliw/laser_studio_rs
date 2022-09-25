@@ -1,10 +1,12 @@
 use super::parser::Span;
 
+#[derive(Clone)]
 pub enum ErrorType {
     ParseError,
     EvaluationError
 }
 
+#[derive(Clone)]
 pub struct Error {
     pub line_number: u64,
     pub col_number: u64,
