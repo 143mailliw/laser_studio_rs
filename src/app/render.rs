@@ -56,7 +56,7 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
 
     let projection_start_time = workspace.projection_start_time.as_secs_f64();
 
-    let mut base_ctx = eval::EvalContext {
+    let base_ctx = eval::EvalContext {
         x: 0.0,
         y: 0.0,
         index: 0.0,
@@ -86,6 +86,8 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
             let result = eval::run(workspace.parser_result.clone(), text.clone(), &mut hash_map, ctx);
             let error = result.1.clone();
 
+            hash_map.insert("index".into(), index as f64);
+
             (hash_map, error)
         })
         .collect();
@@ -103,9 +105,9 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
             RenderedPoint {
                 x: *variables.get("x'").unwrap_or(&0.0),
                 y: *variables.get("y'").unwrap_or(&0.0),
-                h: *variables.get("h").unwrap_or(&130.0),
-                s: *variables.get("s").unwrap_or(&1.0),
-                v: *variables.get("v").unwrap_or(&1.0),
+                h: *variables.get("h").unwrap_or(&0.0),
+                s: *variables.get("s").unwrap_or(&0.0),
+                v: *variables.get("v").unwrap_or(&0.0),
                 index: *variables.get("index").unwrap_or(&0.0) as u16
             }
         })
@@ -136,7 +138,7 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                 let plot_point = plot::Points::new(vec!([point.x, point.y]))
                     .filled(true)
                     .radius(3.0)
-                    .color(egui::color::Hsva::new((point.h % 360.0 / 360.0) as f32, point.s as f32, point.v as f32, 1.0))
+                    .color(egui::color::Hsva::new((point.h % 360.0 / 360.0) as f32, point.s as f32, 1.0, point.v as f32))
                     .name(format!("index: {}", point.index));
 
                 plot_ui.points(plot_point);
