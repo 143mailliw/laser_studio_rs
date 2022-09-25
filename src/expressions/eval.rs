@@ -33,7 +33,7 @@ fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut HashMap<String, f64>)
                 BinaryOperation::Subtract => Ok(eval(&a, variables)? - eval(&b, variables)?),
                 BinaryOperation::Multiply => Ok(eval(&a, variables)? * eval(&b, variables)?),
                 BinaryOperation::Divide => Ok(eval(&a, variables)? / eval(&b, variables)?),
-                BinaryOperation::Modulo => Ok(eval(&a, variables)? / eval(&b, variables)?),
+                BinaryOperation::Modulo => Ok(eval(&a, variables)? % eval(&b, variables)?),
                 BinaryOperation::Exponent => Ok(f64::powf(eval(&a, variables)?, eval(&b, variables)?)),
 
                 // Logical Operations
