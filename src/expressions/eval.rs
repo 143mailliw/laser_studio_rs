@@ -5,7 +5,7 @@ use super::parser::Spanned;
 use super::parser::Span;
 use super::parser::Assignment;
 use super::errors::*;
-use std::collections::HashMap;
+use ahash::AHashMap;
 use rand::Rng;
 
 pub struct RawEvalError {
@@ -13,44 +13,72 @@ pub struct RawEvalError {
     span: Span
 }
 
-fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut HashMap<String, f64>) -> Result<f64, RawEvalError> {
+#[derive(Clone, Copy)]
+pub struct EvalContext {
+    pub x: f64,
+    pub y: f64,
+    pub index: f64,
+    pub count: f64,
+    pub fraction: f64,
+    pub pi: f64,
+    pub tau: f64,
+    pub time: f64,
+    pub projection_time: f64,
+    pub projection_start_time: f64
+}
+
+fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut AHashMap<String, f64>, ctx: EvalContext) -> Result<f64, RawEvalError> {
     let expr = spanned_expr.0.clone();
     let span = spanned_expr.1.clone();
 
     match *expr {
         Expr::Number(x) => Ok(x),
-        Expr::Group(x) => Ok(eval(&x, variables)?),
+        Expr::Group(x) => Ok(eval(&x, variables, ctx)?),
         Expr::UnaryExpression(op, a) => {
             match op {
-                UnaryOperation::Negate => Ok(-eval(&a, variables)?),
-                UnaryOperation::Not => Ok(if eval(&a, variables)? >= 1.0 {0.0} else {1.0})
+                UnaryOperation::Negate => Ok(-eval(&a, variables, ctx)?),
+                UnaryOperation::Not => Ok(if eval(&a, variables, ctx)? >= 1.0 {0.0} else {1.0})
             }
         },
         Expr::BinaryExpression(a, op, b) => {
             match op {
                 // Mathematical Operations
-                BinaryOperation::Add => Ok(eval(&a, variables)? + eval(&b, variables)?),
-                BinaryOperation::Subtract => Ok(eval(&a, variables)? - eval(&b, variables)?),
-                BinaryOperation::Multiply => Ok(eval(&a, variables)? * eval(&b, variables)?),
-                BinaryOperation::Divide => Ok(eval(&a, variables)? / eval(&b, variables)?),
-                BinaryOperation::Modulo => Ok(eval(&a, variables)? % eval(&b, variables)?),
-                BinaryOperation::Exponent => Ok(f64::powf(eval(&a, variables)?, eval(&b, variables)?)),
+                BinaryOperation::Add => Ok(eval(&a, variables, ctx)? + eval(&b, variables, ctx)?),
+                BinaryOperation::Subtract => Ok(eval(&a, variables, ctx)? - eval(&b, variables, ctx)?),
+                BinaryOperation::Multiply => Ok(eval(&a, variables, ctx)? * eval(&b, variables, ctx)?),
+                BinaryOperation::Divide => Ok(eval(&a, variables, ctx)? / eval(&b, variables, ctx)?),
+                BinaryOperation::Modulo => Ok(eval(&a, variables, ctx)? % eval(&b, variables, ctx)?),
+                BinaryOperation::Exponent => Ok(f64::powf(eval(&a, variables, ctx)?, eval(&b, variables, ctx)?)),
 
                 // Logical Operations
-                BinaryOperation::LessThan => Ok((eval(&a, variables)? < eval(&b, variables)?) as u64 as f64),
-                BinaryOperation::GreaterThan => Ok((eval(&a, variables)? > eval(&b, variables)?) as u64 as f64),
-                BinaryOperation::LessThanOrEqual => Ok((eval(&a, variables)? <= eval(&b, variables)?) as u64 as f64),
-                BinaryOperation::GreaterThanOrEqual => Ok((eval(&a, variables)? >= eval(&b, variables)?) as u64 as f64),
-                BinaryOperation::Equal => Ok((eval(&a, variables)? == eval(&b, variables)?) as u64 as f64),
-                BinaryOperation::And => Ok((eval(&a, variables)? >= 1.0 && eval(&b, variables)? >= 1.0) as u64 as f64),
-                BinaryOperation::Or => Ok((eval(&a, variables)? >= 1.0 || eval(&b, variables)? >= 1.0) as u64 as f64),
+                BinaryOperation::LessThan => Ok((eval(&a, variables, ctx)? < eval(&b, variables, ctx)?) as u64 as f64),
+                BinaryOperation::GreaterThan => Ok((eval(&a, variables, ctx)? > eval(&b, variables, ctx)?) as u64 as f64),
+                BinaryOperation::LessThanOrEqual => Ok((eval(&a, variables, ctx)? <= eval(&b, variables, ctx)?) as u64 as f64),
+                BinaryOperation::GreaterThanOrEqual => Ok((eval(&a, variables, ctx)? >= eval(&b, variables, ctx)?) as u64 as f64),
+                BinaryOperation::Equal => Ok((eval(&a, variables, ctx)? == eval(&b, variables, ctx)?) as u64 as f64),
+                BinaryOperation::And => Ok((eval(&a, variables, ctx)? >= 1.0 && eval(&b, variables, ctx)? >= 1.0) as u64 as f64),
+                BinaryOperation::Or => Ok((eval(&a, variables, ctx)? >= 1.0 || eval(&b, variables, ctx)? >= 1.0) as u64 as f64),
             }
         },
         Expr::Variable(name) => {
-            let result = variables.get(&name);
-
+            let result = match name.as_str() {
+                "x" => Some(ctx.x),
+                "y" => Some(ctx.y),
+                "index" => Some(ctx.index),
+                "count" => Some(ctx.count),
+                "fraction" => Some(ctx.fraction),
+                "pi" => Some(ctx.pi),
+                "tau" => Some(ctx.tau),
+                "time" => Some(ctx.time),
+                "projectionTime" => Some(ctx.projection_time),
+                "projectionStartTime" => Some(ctx.projection_start_time),
+                _ => match variables.get(&name) {
+                    Some(value) => Some(*value),
+                    None => None
+                }
+            };
             match result {
-                Some(value) => Ok(*value),
+                Some(value) => Ok(value),
                 None => Err(RawEvalError { 
                     error: format!("Cannot find variable '{name}'. Are you using it too early?"),
                     span
@@ -61,7 +89,7 @@ fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut HashMap<String, f64>)
         Expr::Call(func, args) => {
             let arguments_results = args
                 .iter()
-                .map(|a| eval(&a, variables))
+                .map(|a| eval(&a, variables, ctx))
                 .collect::<Result<Vec<f64>, RawEvalError>>();
 
             let arguments = match arguments_results {
@@ -116,11 +144,11 @@ fn function(name: &str, exp_count: u8, c: impl Fn(Vec<f64>) -> f64, span: Span, 
     }
 }
 
-pub fn run(assignments: Vec<Assignment>, text: String, variables: &mut HashMap<String, f64>) -> (&mut HashMap<String, f64>, Vec<Error>) {
+pub fn run(assignments: Vec<Assignment>, text: String, variables: &mut AHashMap<String, f64>, ctx: EvalContext) -> (&mut AHashMap<String, f64>, Vec<Error>) {
     let mut errors: Vec<Error> = vec!();
 
     for assignment in assignments {
-        let eval_result = eval(&assignment.expression, variables);
+        let eval_result = eval(&assignment.expression, variables, ctx);
 
         match eval_result {
             Ok(value) => { variables.insert(assignment.name, value); },

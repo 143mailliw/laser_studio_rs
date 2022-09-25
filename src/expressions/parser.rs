@@ -68,21 +68,14 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .map(Expr::Variable)
             .map_with_span(|expr, span: Span| (expr, span));
 
-        // delimiters weren't working here for some weird reason
-        let group = just('(')
-            .padded()
-            .ignore_then(expr.clone())
-            .padded()
-            .then_ignore(just(')'))
+        let group = expr.clone()
+            .delimited_by(just('('), just(')'))
             .padded()
             .map(|expr: Spanned<Expr>| Expr::Group((Box::new(expr.0), expr.1)))
             .map_with_span(|expr, span: Span| (expr, span));
 
         let call = ident
-            .then_ignore(just('('))
-            .padded()
-            .then(expr.clone().separated_by(just(",")))
-            .then_ignore(just(')'))
+            .then(expr.clone().separated_by(just(",")).delimited_by(just('('), just(')')))
             .padded()
             .map(|(ident, vec)| Expr::Call(ident, vec.iter().map(|spanned| (Box::new(spanned.0.clone()), spanned.1.clone())).collect()))
             .map_with_span(|expr, span: Span| (expr, span));
@@ -94,21 +87,22 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
 
         let op = |c| just(c).padded();
         let dc_op = |c, c2| just(c).then(just(c2)).padded();
- 
+
         let unary = op('-').to(UnaryOperation::Negate)
             .or(op('!').to(UnaryOperation::Not))
             .map_with_span(|expr, span: Span| (expr, span))
             .repeated()
             .then(atom)
-            .foldr(|op, right| (Expr::UnaryExpression(op.0, (Box::new(right.0), right.1.clone())), op.1.start..right.1.end));
-
+            .foldr(|op, right| (Expr::UnaryExpression(op.0, (Box::new(right.0), right.1.clone())), op.1.start..right.1.end))
+            .labelled("expression");
 
         let binary_first = unary.clone()
             .then(op('^').to(BinaryOperation::Exponent)
                 .then(unary)
                 .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
-            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
+            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end))
+            .labelled("expression");
 
         let binary_second = binary_first.clone()
             .then(op('*').to(BinaryOperation::Multiply)
@@ -117,7 +111,8 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
                 .then(binary_first) 
                 .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
-            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
+            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end))
+            .labelled("expression");
 
         let binary_third = binary_second.clone()
             .then(op('+').to(BinaryOperation::Add)
@@ -125,7 +120,8 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
                 .then(binary_second)
                 .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
-            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
+            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end))
+            .labelled("expression");
 
         let logical_first = binary_third.clone()
             .then(dc_op('<', '=').to(BinaryOperation::LessThanOrEqual)
@@ -136,7 +132,8 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
                 .then(binary_third)
                 .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
-            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
+            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end))
+            .labelled("expression");
 
         let logical_last = logical_first.clone()
             .then(op('&').to(BinaryOperation::And)
@@ -144,7 +141,8 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
                 .then(logical_first)
                 .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
-            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
+            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end))
+            .labelled("expression");
 
         logical_last
     });
@@ -160,11 +158,12 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             name,
             expression: (Box::new(right.0), right.1),
             span
-        });
+        })
+        .labelled("variable assignment");
 
     // TODO: fix this erroring on EOL
     let comment = just::<_, _, Simple<char>>('#')
-        .then(take_until(just('\n')))
+        .then(take_until(just('\n').labelled("new line")))
         .padded()
         .ignored();
 
@@ -175,4 +174,4 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
         .padded()
         .repeated()
         .then_ignore(end())
-} 
+}

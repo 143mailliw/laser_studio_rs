@@ -4,7 +4,7 @@ use eframe::egui;
 use eframe::egui::plot;
 use rayon::prelude::*;
 use std::time;
-use std::collections::HashMap;
+use ahash::AHashMap;
 
 pub struct RenderWorkspace {
     parser_result: Vec<parser::Assignment>,
@@ -32,7 +32,8 @@ struct RenderedPoint {
     y: f64,
     h: f64,
     s: f64,
-    v: f64
+    v: f64,
+    index: u16
 }
 
 pub fn on_switch_render(app: &mut super::LaserStudioApp) {
@@ -48,36 +49,44 @@ pub fn on_switch_render(app: &mut super::LaserStudioApp) {
 
 
 fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<RenderedPoint> {
-    let mut base_hash_map: HashMap<String, f64> = HashMap::new(); 
     let time = time::SystemTime::now()
         .duration_since(time::SystemTime::UNIX_EPOCH)
         .expect("time went backwards")
         .as_secs_f64();
+
     let projection_start_time = workspace.projection_start_time.as_secs_f64();
 
-    base_hash_map.insert("count".into(), 400.0);
-    base_hash_map.insert("pi".into(), std::f64::consts::PI);
-    base_hash_map.insert("tau".into(), std::f64::consts::TAU);
-    base_hash_map.insert("time".into(), time as f64);
-    base_hash_map.insert("projectionTime".into(), time - projection_start_time);
-    base_hash_map.insert("projectionStartTime".into(), projection_start_time);
+    let mut base_ctx = eval::EvalContext {
+        x: 0.0,
+        y: 0.0,
+        index: 0.0,
+        count: 400.0,
+        fraction: 0.0,
+        pi: std::f64::consts::PI,
+        tau: std::f64::consts::TAU,
+        time,
+        projection_time: time - projection_start_time,
+        projection_start_time
+    };
 
     workspace.eval_errors = vec![];
 
-    let points: Vec<(HashMap<String, f64>, Vec<errors::Error>)> = (0..400)
+    let points: Vec<(AHashMap<String, f64>, Vec<errors::Error>)> = (0..400)
         .into_par_iter()
         .map(|index| {
-            let mut hash_map = base_hash_map.clone();
+            let mut ctx = base_ctx.clone();
 
-            hash_map.insert("index".into(), index as f64);
-            hash_map.insert("x".into(), ((index % 20 - 10) * 10) as f64);
-            hash_map.insert("y".into(), ((index / 20 - 9) * 10) as f64);
-            hash_map.insert("fraction".into(), index as f64 / 400.0);
+            ctx.index = index as f64;
+            ctx.x = ((index % 20 - 10) * 10) as f64;
+            ctx.y = ((index / 20 - 9) * 10) as f64;
+            ctx.fraction = index as f64 / 400.0;
+
+            let mut hash_map = AHashMap::new();
         
-            let result = eval::run(workspace.parser_result.clone(), text.clone(), &mut hash_map);
+            let result = eval::run(workspace.parser_result.clone(), text.clone(), &mut hash_map, ctx);
             let error = result.1.clone();
 
-            (hash_map.to_owned(), error)
+            (hash_map, error)
         })
         .collect();
 
@@ -96,7 +105,8 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
                 y: *variables.get("y'").unwrap_or(&0.0),
                 h: *variables.get("h").unwrap_or(&130.0),
                 s: *variables.get("s").unwrap_or(&1.0),
-                v: *variables.get("v").unwrap_or(&1.0)
+                v: *variables.get("v").unwrap_or(&1.0),
+                index: *variables.get("index").unwrap_or(&0.0) as u16
             }
         })
         .collect();
@@ -123,10 +133,11 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
 
         plot.show(ui, |plot_ui| {
             for point in calculated_points {
-                let plot_point =plot::Points::new(vec!([point.x, point.y]))
+                let plot_point = plot::Points::new(vec!([point.x, point.y]))
                     .filled(true)
                     .radius(3.0)
-                    .color(egui::color::Hsva::new((point.h % 360.0 / 360.0) as f32, point.s as f32, point.v as f32, 1.0));
+                    .color(egui::color::Hsva::new((point.h % 360.0 / 360.0) as f32, point.s as f32, point.v as f32, 1.0))
+                    .name(format!("index: {}", point.index));
 
                 plot_ui.points(plot_point);
             }
