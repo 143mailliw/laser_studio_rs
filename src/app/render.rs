@@ -82,6 +82,9 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
         .collect();
 
     for tuple in points.clone() {
+        if tuple.1.len() > 0 {
+            println!("{:?}", tuple.1.clone());
+        }
         workspace.eval_errors.push(tuple.1.clone());
     }
 
@@ -120,7 +123,6 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
 
         plot.show(ui, |plot_ui| {
             for point in calculated_points {
-                println!("{}", point.h / 360.0);
                 let plot_point =plot::Points::new(vec!([point.x, point.y]))
                     .filled(true)
                     .radius(3.0)

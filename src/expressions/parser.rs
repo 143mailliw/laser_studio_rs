@@ -83,6 +83,7 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .padded()
             .then(expr.clone().separated_by(just(",")))
             .then_ignore(just(')'))
+            .padded()
             .map(|(ident, vec)| Expr::Call(ident, vec.iter().map(|spanned| (Box::new(spanned.0.clone()), spanned.1.clone())).collect()))
             .map_with_span(|expr, span: Span| (expr, span));
 
@@ -127,11 +128,11 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Box::new(left.0), left.1.clone()), op, (Box::new(right.0), right.1)), left.1.start..span.end));
 
         let logical_first = binary_third.clone()
-            .then(op('<').to(BinaryOperation::LessThan)
-                .or(op('>').to(BinaryOperation::GreaterThan))
-                .or(dc_op('<', '=').to(BinaryOperation::LessThanOrEqual))
+            .then(dc_op('<', '=').to(BinaryOperation::LessThanOrEqual)
                 .or(dc_op('>', '=').to(BinaryOperation::GreaterThanOrEqual))
                 .or(dc_op('=', '=').to(BinaryOperation::Equal))
+                .or(op('<').to(BinaryOperation::LessThan))
+                .or(op('>').to(BinaryOperation::GreaterThan))
                 .then(binary_third)
                 .map_with_span(|expr, span: Span| (expr, span))
                 .repeated())
@@ -152,6 +153,7 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
         .padded()
         .then_ignore(just('='))
         .then(expr.clone())
+        .padded()
         .then_ignore(just(';'))
         .map_with_span(|expr, span: Span| (expr, span))
         .map(|((name, right), span)| Assignment {

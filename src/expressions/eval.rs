@@ -75,7 +75,7 @@ fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut HashMap<String, f64>)
                 "tan" => function("tan", 1, |args| f64::tan(args[0]), span, arguments),
                 "asin" => function("asin", 1, |args| f64::asin(args[0]), span, arguments),
                 "acos" => function("acos", 1, |args| f64::acos(args[0]), span, arguments),
-            "atan" => function("atan", 1, |args| f64::atan(args[0]), span, arguments),
+                "atan" => function("atan", 1, |args| f64::atan(args[0]), span, arguments),
                 "atan2" => function("atan2", 2, |args| f64::atan2(args[0], args[1]), span, arguments),
                 "sqrt" => function("sqrt", 1, |args| f64::sqrt(args[0]), span, arguments),
                 "min" => function("min", 2, |args| f64::min(args[0], args[1]), span, arguments),
