@@ -137,43 +137,6 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
 }
 
 pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudioApp) {
-    if !app.render.eval_frozen {
-        app.render.eval_result = calculate_points(&mut app.render, app.project.text_data.content.clone());
-    }
-
-    let mut frame = egui::Frame::default();
-
-    frame.inner_margin = egui::style::Margin {left: 0.0, right: 0.0, top: 0.0, bottom: 0.0};
-    frame.fill = ctx.style().visuals.window_fill();
-
-    egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
-        let plot = plot::Plot::new("render_plot")
-            .show_axes([false, false])
-            .data_aspect(1.0)
-            .include_x(150.0)
-            .include_x(-150.0)
-            .include_y(150.0)
-            .include_y(-150.0);
-
-        plot.show(ui, |plot_ui| {
-            for point in app.render.eval_result.iter() {
-                if point.v != 0.0 {
-                    let plot_point = plot::Points::new(vec!([point.x, point.y]))
-                        .filled(true)
-                        .radius(3.0)
-                        .color(egui::color::Hsva::new((point.h % 360.0 / 360.0) as f32, point.s as f32, point.v as f32, 1.0))
-                        .name(format!("index: {}", point.index));
-
-                    plot_ui.points(plot_point);
-                }
-            }
-        });
-
-        if !app.render.eval_frozen {
-            ctx.request_repaint();
-        }
-    });
-
     let mut tools_frame = egui::Frame::default();
 
     tools_frame.inner_margin = egui::style::Margin {left: 5.0, right: 5.0, top: 5.0, bottom: 5.0};
@@ -333,6 +296,43 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
 
                     }
                 });
+        }
+    });
+
+    if !app.render.eval_frozen {
+        app.render.eval_result = calculate_points(&mut app.render, app.project.text_data.content.clone());
+    }
+
+    let mut frame = egui::Frame::default();
+
+    frame.inner_margin = egui::style::Margin {left: 0.0, right: 0.0, top: 0.0, bottom: 0.0};
+    frame.fill = ctx.style().visuals.window_fill();
+
+    egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
+        let plot = plot::Plot::new("render_plot")
+            .show_axes([false, false])
+            .data_aspect(1.0)
+            .include_x(150.0)
+            .include_x(-150.0)
+            .include_y(150.0)
+            .include_y(-150.0);
+
+        plot.show(ui, |plot_ui| {
+            for point in app.render.eval_result.iter() {
+                if point.v != 0.0 {
+                    let plot_point = plot::Points::new(vec!([point.x, point.y]))
+                        .filled(true)
+                        .radius(3.0)
+                        .color(egui::color::Hsva::new((point.h % 360.0 / 360.0) as f32, point.s as f32, point.v as f32, 1.0))
+                        .name(format!("index: {}", point.index));
+
+                    plot_ui.points(plot_point);
+                }
+            }
+        });
+
+        if !app.render.eval_frozen {
+            ctx.request_repaint();
         }
     });
 }
