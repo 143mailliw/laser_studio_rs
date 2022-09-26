@@ -28,7 +28,7 @@ pub struct EvalContext {
 }
 
 fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut AHashMap<String, f64>, ctx: EvalContext) -> Result<f64, RawEvalError> {
-    let expr = *spanned_expr.0.clone();
+    let expr = (&*spanned_expr.0).clone();
     let span = &spanned_expr.1;
 
     match expr {
