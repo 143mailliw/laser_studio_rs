@@ -28,10 +28,55 @@ pub struct EvalContext {
 }
 
 fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut AHashMap<String, f64>, ctx: EvalContext) -> Result<f64, RawEvalError> {
-    let expr = spanned_expr.0.clone();
-    let span = spanned_expr.1.clone();
+    let expr = *spanned_expr.0.clone();
+    let span = &spanned_expr.1;
 
-    match *expr {
+    match expr {
+        Expr::Call(func, args) => {
+            match func.as_str() {                
+                "if" => function_complex("if", 3, |args| if eval(&args[0], variables, ctx)? >= 1.0 {eval(&args[1], variables, ctx)} else {eval(&args[2], variables, ctx)}, span, args),
+                _ => {
+                    let arguments_results = args
+                        .iter()
+                        .map(|a| eval(&a, variables, ctx))
+                        .collect::<Result<Vec<f64>, RawEvalError>>();
+
+                    let arguments = match arguments_results {
+                        Ok(args) => args,
+                        Err(error) => return Err(error)
+                    };
+
+                    match func.as_str() {
+                        "sin" => function("sin", 1, |args| f64::sin(args[0]), span, arguments),
+                        "cos" => function("cos", 1, |args| f64::cos(args[0]), span, arguments),
+                        "tan" => function("tan", 1, |args| f64::tan(args[0]), span, arguments),
+                        "asin" => function("asin", 1, |args| f64::asin(args[0]), span, arguments),
+                        "acos" => function("acos", 1, |args| f64::acos(args[0]), span, arguments),
+                        "atan" => function("atan", 1, |args| f64::atan(args[0]), span, arguments),
+                        "atan2" => function("atan2", 2, |args| f64::atan2(args[0], args[1]), span, arguments),
+                        "sqrt" => function("sqrt", 1, |args| f64::sqrt(args[0]), span, arguments),
+                        "min" => function("min", 2, |args| f64::min(args[0], args[1]), span, arguments),
+                        "max" => function("max", 2, |args| f64::max(args[0], args[1]), span, arguments),
+                        "floor" => function("floor", 1, |args| f64::floor(args[0]), span, arguments),
+                        "ceil" => function("ceil", 1, |args| f64::ceil(args[0]), span, arguments),
+                        "round" => function("round", 1, |args| f64::round(args[0]), span, arguments),
+                        "abs" => function("abs", 1, |args| f64::abs(args[0]), span, arguments),
+                        "rand" => function("rand", 0, |_args| {
+                            let mut rng = rand::thread_rng();
+                            
+                            rng.gen::<f64>()
+                        }, span, arguments),
+                        // "if" => function("if", 3, |args| if args[0] >= 1.0 {args[1]} else {args[2]}, span, arguments),
+                        // formula for this is from the steam guide
+                        "lerp" => function("lerp", 3, |args| (args[1] * args[0] + args[2] * (1.0 - args[0])), span, arguments),
+                        _ => return Err(RawEvalError {
+                            error: format!("No such function '{func}'."), 
+                            span: span.clone()
+                        })
+                    }
+                } 
+            }
+        },
         Expr::Number(x) => Ok(x),
         Expr::Group(x) => Ok(eval(&x, variables, ctx)?),
         Expr::UnaryExpression(op, a) => {
@@ -81,60 +126,15 @@ fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut AHashMap<String, f64>
                 Some(value) => Ok(value),
                 None => Err(RawEvalError { 
                     error: format!("Cannot find variable '{name}'. Are you using it too early?"),
-                    span
+                    span: span.clone()
                 })
 
-            }
-        },
-        Expr::Call(func, args) => {
-            match func.as_str() {                
-                "if" => function_complex("if", 3, |args| if eval(&args[0], variables, ctx)? >= 1.0 {eval(&args[1], variables, ctx)} else {eval(&args[2], variables, ctx)}, span, args),
-                _ => {
-                    let arguments_results = args
-                        .iter()
-                        .map(|a| eval(&a, variables, ctx))
-                        .collect::<Result<Vec<f64>, RawEvalError>>();
-
-                    let arguments = match arguments_results {
-                        Ok(args) => args,
-                        Err(error) => return Err(error)
-                    };
-
-                    match func.as_str() {
-                        "sin" => function("sin", 1, |args| f64::sin(args[0]), span, arguments),
-                        "cos" => function("cos", 1, |args| f64::cos(args[0]), span, arguments),
-                        "tan" => function("tan", 1, |args| f64::tan(args[0]), span, arguments),
-                        "asin" => function("asin", 1, |args| f64::asin(args[0]), span, arguments),
-                        "acos" => function("acos", 1, |args| f64::acos(args[0]), span, arguments),
-                        "atan" => function("atan", 1, |args| f64::atan(args[0]), span, arguments),
-                        "atan2" => function("atan2", 2, |args| f64::atan2(args[0], args[1]), span, arguments),
-                        "sqrt" => function("sqrt", 1, |args| f64::sqrt(args[0]), span, arguments),
-                        "min" => function("min", 2, |args| f64::min(args[0], args[1]), span, arguments),
-                        "max" => function("max", 2, |args| f64::max(args[0], args[1]), span, arguments),
-                        "floor" => function("floor", 1, |args| f64::floor(args[0]), span, arguments),
-                        "ceil" => function("ceil", 1, |args| f64::ceil(args[0]), span, arguments),
-                        "round" => function("round", 1, |args| f64::round(args[0]), span, arguments),
-                        "abs" => function("abs", 1, |args| f64::abs(args[0]), span, arguments),
-                        "rand" => function("rand", 0, |_args| {
-                            let mut rng = rand::thread_rng();
-                            
-                            rng.gen::<f64>()
-                        }, span, arguments),
-                        // "if" => function("if", 3, |args| if args[0] >= 1.0 {args[1]} else {args[2]}, span, arguments),
-                        // formula for this is from the steam guide
-                        "lerp" => function("lerp", 3, |args| (args[1] * args[0] + args[2] * (1.0 - args[0])), span, arguments),
-                        _ => return Err(RawEvalError {
-                            error: format!("No such function '{func}'."), 
-                            span
-                        })
-                    }
-                } 
             }
         }
     }
 }
 
-fn function(name: &str, exp_count: u8, c: impl Fn(Vec<f64>) -> f64, span: Span, arguments: Vec<f64>) -> Result<f64, RawEvalError> {
+fn function(name: &str, exp_count: u8, c: impl Fn(Vec<f64>) -> f64, span: &Span, arguments: Vec<f64>) -> Result<f64, RawEvalError> {
     if arguments.len() == exp_count.into() {
         Ok(c(arguments))
     } else {
@@ -144,12 +144,12 @@ fn function(name: &str, exp_count: u8, c: impl Fn(Vec<f64>) -> f64, span: Span, 
 
         Err(RawEvalError {
             error: format!("Function '{name}' expected {exp_count} {exp_count_text}, but only got {actual_count} {actual_count_text}."),
-            span
+            span: span.clone()
         })
     }
 }
 
-fn function_complex<T>(name: &str, exp_count: u8, mut c: impl FnMut(Vec<T>) -> Result<f64, RawEvalError>, span: Span, arguments: Vec<T>) -> Result<f64, RawEvalError> {
+fn function_complex<T>(name: &str, exp_count: u8, mut c: impl FnMut(Vec<T>) -> Result<f64, RawEvalError>, span: &Span, arguments: Vec<T>) -> Result<f64, RawEvalError> {
     if arguments.len() == exp_count.into() {
         c(arguments)
     } else {
@@ -159,7 +159,7 @@ fn function_complex<T>(name: &str, exp_count: u8, mut c: impl FnMut(Vec<T>) -> R
 
         Err(RawEvalError {
             error: format!("Function '{name}' expected {exp_count} {exp_count_text}, but only got {actual_count} {actual_count_text}."),
-            span
+            span: span.clone()
         })
     }
 }
