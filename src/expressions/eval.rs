@@ -7,6 +7,7 @@ use super::parser::Assignment;
 use super::errors::*;
 use ahash::AHashMap;
 use rand::Rng;
+use std::sync::Arc;
 
 pub struct RawEvalError {
     error: String,
@@ -27,7 +28,7 @@ pub struct EvalContext {
     pub projection_start_time: f64
 }
 
-fn eval(spanned_expr: &Spanned<Box<Expr>>, variables: &mut AHashMap<String, f64>, ctx: EvalContext) -> Result<f64, RawEvalError> {
+fn eval(spanned_expr: &Spanned<Arc<Expr>>, variables: &mut AHashMap<String, f64>, ctx: EvalContext) -> Result<f64, RawEvalError> {
     let expr = (&*spanned_expr.0).clone();
     let span = &spanned_expr.1;
 
