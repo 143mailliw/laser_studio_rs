@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 use std::sync::Arc;
-
+use super::errors;
 pub type Span = std::ops::Range<usize>;
 pub type Spanned<T> = (T, Span);
 
@@ -174,4 +174,61 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
         .padded()
         .repeated()
         .then_ignore(end())
+}
+
+pub fn process_parser_error(error: Simple<char>, text: String) -> errors::Error {
+    let loc = errors::get_position_from_span(error.span(), text.clone());
+
+    let mut processed_error = errors::Error {
+        line_number: loc.0,
+        col_number: loc.1,
+        error_type: errors::ErrorType::ParseError,
+        reason: "P255: Unexpected parser error.".to_string(),
+        id: 255
+    };
+
+    let mut found_character = error.found();
+
+    let mut wants_semi = false;
+    let mut wants_close_parens = false;
+    let mut wants_new_line = false;
+    let mut wants_num = false;
+
+    let got_period = found_character == Some(&'.');
+    let got_none = found_character == None;
+
+    error
+        .expected()
+        .for_each(|want| {
+            match want {
+                Some(';') => wants_semi = true,
+                Some(')') => wants_close_parens = true,
+                Some('\n') => wants_new_line = true,
+                Some('0') => wants_num = true,
+                None => panic!("parser gave an error for no reason"),
+                _ => ()
+            }
+        });
+
+    if got_none && wants_new_line {
+        processed_error.reason = "P1: Expressions cannot end in a comment.".into();
+        processed_error.id = 1;
+    } else if got_none {
+        processed_error.reason = "P2: Unexpected end of file.".into();
+        processed_error.id = 2;
+    } else if got_period && wants_num {
+        processed_error.reason = "P3: Laser Studio doesn't support shorthand float literals (eg. .1). Please use full literals instead (eg. 0.1).".into();
+        processed_error.id = 3;
+    } else if wants_semi {
+        processed_error.reason = format!("P4: Unexpected character '{}'. Perhaps you forgot a semi-colon?", found_character.unwrap_or(&'_'));
+        processed_error.id = 4;
+    } else if wants_close_parens {
+        processed_error.reason = format!("P5: Unexpected character '{}'. Perhaps you forgot to close your parenthesis?", found_character.unwrap_or(&'_'));
+        processed_error.id = 5;
+    } else {
+        processed_error.reason = format!("P0: Unexpected character '{}'.", found_character.unwrap_or(&'_'));
+        processed_error.id = 0;
+    }
+
+    processed_error
 }

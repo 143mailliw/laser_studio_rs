@@ -58,9 +58,16 @@ struct RenderedPoint {
 }
 
 pub fn on_switch_render(app: &mut super::LaserStudioApp) {
-    app.render.parser_result = match parser::parser().parse(app.project.text_data.content.clone()) {
-        Ok(value) => value,
-        Err(error) => panic!("Error parsing: {:?}", error)
+    match parser::parser().parse(app.project.text_data.content.clone()) {
+        Ok(value) => {
+            app.render.parser_errors = vec![];
+            app.render.parser_result = value;
+        },
+        Err(error) => {
+            app.render.parser_errors = error.iter().map(|err| {
+                parser::process_parser_error(err.clone(), app.project.text_data.content.clone())
+            }).collect();
+        }
     };
 
     app.render.projection_start_time = time::SystemTime::now()
@@ -93,7 +100,7 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
     workspace.eval_errors = vec![];
     workspace.eval_variables = vec![];
 
-    let points: Vec<(AHashMap<String, f64>, Vec<errors::Error>)> = (0..400)
+    let points: Vec<(AHashMap<String, f64>, Vec<errors::Error>, eval::EvalContext)> = (0..400)
         .into_par_iter()
         .map(|index| {
             let mut ctx = base_ctx.clone();
@@ -107,10 +114,7 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
         
             let result = eval::run(workspace.parser_result.clone(), text.clone(), &mut hash_map, ctx);
             let error = result.1.clone();
-
-            hash_map.insert("index".into(), index as f64);
-
-            (hash_map, error)
+            (hash_map, error, ctx)
         })
         .collect();
 
@@ -121,14 +125,14 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
 
     let calculated_points = points
         .par_iter()
-        .map(|(variables, _errors)| {
+        .map(|(variables, _errors, ctx)| {
             RenderedPoint {
-                x: *variables.get("x'").unwrap_or(&0.0),
-                y: *variables.get("y'").unwrap_or(&0.0),
+                x: *variables.get("x'").unwrap_or(&ctx.x),
+                y: *variables.get("y'").unwrap_or(&ctx.y),
                 h: *variables.get("h").unwrap_or(&0.0),
-                s: *variables.get("s").unwrap_or(&0.0),
-                v: *variables.get("v").unwrap_or(&0.0),
-                index: *variables.get("index").unwrap_or(&0.0) as u16
+                s: *variables.get("s").unwrap_or(&1.0),
+                v: *variables.get("v").unwrap_or(&1.0),
+                index: ctx.index as u16
             }
         })
         .collect();
@@ -205,14 +209,20 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                 }
             };
 
-            let eval_errors: Vec<errors::Error> = app.render.eval_errors[index].clone();
+            let eval_errors = app.render.eval_errors[index].clone();
+            let parser_errors = app.render.parser_errors.clone();
+
+            ui.spacing_mut().item_spacing = egui::vec2(0.0, 6.0);
+            ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
+            ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
+            ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
 
             TableBuilder::new(ui)
                 .column(Size::exact(100.0))
                 .column(Size::exact(100.0))
                 .column(Size::remainder())
                 .striped(true)
-                .header(16.0, |mut header| {
+                .header(14.0, |mut header| {
                     header.col(|ui| {
                         ui.label("Type");
                     });
@@ -225,9 +235,22 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                 })
                 .body(|mut body| {
                     for error in eval_errors {
-                        body.row(16.0, |mut row| {
+                        body.row(14.0, |mut row| {
                             row.col(|ui| {
                                 ui.label("Runtime");
+                            });
+                            row.col(|ui| {
+                                ui.label(error.line_number.to_string() + &String::from(":") + &error.col_number.to_string());
+                            });
+                            row.col(|ui| {
+                                ui.label(error.reason.to_string());
+                            });
+                        });
+                    };
+                    for error in parser_errors {
+                        body.row(14.0, |mut row| {
+                            row.col(|ui| {
+                                ui.label("Parser");
                             });
                             row.col(|ui| {
                                 ui.label(error.line_number.to_string() + &String::from(":") + &error.col_number.to_string());
@@ -268,11 +291,16 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
 
             let eval_variables: AHashMap<String, f64> = app.render.eval_variables[index].clone();
 
+            ui.spacing_mut().item_spacing = egui::vec2(0.0, 6.0);
+            ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
+            ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
+            ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
+
             TableBuilder::new(ui)
                 .column(Size::exact(150.0))
                 .column(Size::remainder().at_least(150.0))
                 .striped(true)
-                .header(16.0, |mut header| {
+                .header(14.0, |mut header| {
                     header.col(|ui| {
                         ui.label("Name");
                     });
@@ -285,12 +313,12 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                     sorted.sort_by_key(|a| a.0);
 
                     for variable in sorted {
-                        body.row(16.0, |mut row| {
+                        body.row(14.0, |mut row| {
                             row.col(|ui| {
-                                ui.label(variable.0);
+                                ui.monospace(variable.0);
                             });
                             row.col(|ui| {
-                                ui.label(variable.1.to_string());
+                                ui.monospace(variable.1.to_string());
                             });
                         })
 

@@ -11,7 +11,8 @@ pub struct Error {
     pub line_number: u64,
     pub col_number: u64,
     pub reason: String,
-    pub error_type: ErrorType
+    pub error_type: ErrorType,
+    pub id: u8 // we'll use this to show documentation later
 }
 
 pub fn get_position_from_span(span: Span, string: String) -> (u64, u64) {
@@ -19,7 +20,7 @@ pub fn get_position_from_span(span: Span, string: String) -> (u64, u64) {
     // but we keep it the whole time for things like error highlighting
     let mut remaining_chars: u64 = span.start
         .try_into()
-        .expect("congratulations on making a text file that is longer than 18446744073709551615 characters");
+        .expect("text file is longer than 18446744073709551615 characters");
     let mut line = 0;
 
     for cur_line in string.lines() {
