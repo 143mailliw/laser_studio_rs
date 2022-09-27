@@ -80,13 +80,40 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .map(|(ident, vec)| Expr::Call(ident, vec.iter().map(|spanned| (Arc::new(spanned.0.clone()), spanned.1.clone())).collect()))
             .map_with_span(|expr, span: Span| (expr, span));
 
-        let atom = num
+        // TODO: this sucks, find a better way to do this that doesn't suck
+        let op = |c| just(c).padded();
+        let dc_op = |c, c2| just(c).then(just(c2)).padded();
+
+        let short_mul_rhs = call.clone()
+            .or(group.clone())
+            .or(variable_reference.clone());
+
+        let short_mul_neg = op('-')
+            .map_with_span(|expr, span: Span| (expr, span))
+            .repeated()
+            .then(short_mul_rhs.clone().or(num.clone()))
+            .foldr(|op, right| (Expr::UnaryExpression(UnaryOperation::Negate, (Arc::new(right.0), right.1.clone())), op.1.start..right.1.end))
+            .labelled("expression");
+
+        let short_mul_exp = short_mul_rhs.clone()
+            .then(op('^')
+                .to(BinaryOperation::Exponent)
+                .then(short_mul_neg)
+                .map_with_span(|expr, span: Span| (expr, span))
+                .repeated())
+            .foldl(|left, ((_op, right), span)| (Expr::BinaryExpression((Arc::new(left.0), left.1.clone()), BinaryOperation::Exponent, (Arc::new(right.0), right.1)), left.1.start..span.end))
+            .labelled("expression");
+
+
+        let short_mul = num.clone()
+            .then(short_mul_exp)
+            .map(|(lhs, rhs)| (Expr::BinaryExpression((Arc::new(lhs.0), lhs.1.clone()), BinaryOperation::Multiply, (Arc::new(rhs.0), rhs.1.clone())), lhs.1.start..rhs.1.end));
+
+        let atom = short_mul
+            .or(num)
             .or(call)
             .or(group)
             .or(variable_reference);
-
-        let op = |c| just(c).padded();
-        let dc_op = |c, c2| just(c).then(just(c2)).padded();
 
         let unary = op('-').to(UnaryOperation::Negate)
             .or(op('!').to(UnaryOperation::Not))
