@@ -11,7 +11,8 @@ use std::sync::Arc;
 
 pub struct RawEvalError {
     error: String,
-    span: Span
+    span: Span,
+    id: u8
 }
 
 #[derive(Clone, Copy)]
@@ -28,6 +29,8 @@ pub struct EvalContext {
     pub projection_start_time: f64
 }
 
+const RESERVED_VARIABLE_NAMES: [&str; 26] = ["x", "y", "index", "count", "fraction", "pi", "tau", "time", "projectionTime", "projectionStartTime", "sin", "cos", "tan", "asin", "acos", "atan", "atan2", "sqrt", "min", "max", "floor", "ceil", "round", "abs", "if", "lerp"];
+
 fn eval(spanned_expr: &Spanned<Arc<Expr>>, variables: &mut AHashMap<String, f64>, ctx: EvalContext) -> Result<f64, RawEvalError> {
     let expr = (&*spanned_expr.0).clone();
     let span = &spanned_expr.1;
@@ -37,7 +40,7 @@ fn eval(spanned_expr: &Spanned<Arc<Expr>>, variables: &mut AHashMap<String, f64>
             match func.as_str() {                
                 "if" => function_complex("if", 3, |args| if eval(&args[0], variables, ctx)? >= 1.0 {eval(&args[1], variables, ctx)} else {eval(&args[2], variables, ctx)}, span, args),
                 _ => {
-                    let arguments_results = args
+                    let arguments_results = args 
                         .iter()
                         .map(|a| eval(&a, variables, ctx))
                         .collect::<Result<Vec<f64>, RawEvalError>>();
@@ -71,8 +74,9 @@ fn eval(spanned_expr: &Spanned<Arc<Expr>>, variables: &mut AHashMap<String, f64>
                         // formula for this is from the steam guide
                         "lerp" => function("lerp", 3, |args| (args[1] * args[0] + args[2] * (1.0 - args[0])), span, arguments),
                         _ => return Err(RawEvalError {
-                            error: format!("No such function '{func}'."), 
-                            span: span.clone()
+                            error: format!("E3: No such function '{func}'."), 
+                            span: span.clone(),
+                            id: 3
                         })
                     }
                 } 
@@ -126,10 +130,10 @@ fn eval(spanned_expr: &Spanned<Arc<Expr>>, variables: &mut AHashMap<String, f64>
             match result {
                 Some(value) => Ok(value),
                 None => Err(RawEvalError { 
-                    error: format!("Cannot find variable '{name}'. Are you using it too early?"),
-                    span: span.clone()
+                    error: format!("E2: Cannot find variable '{name}'. Are you using it too early?"),
+                    span: span.clone(),
+                    id: 3
                 })
-
             }
         }
     }
@@ -144,8 +148,9 @@ fn function(name: &str, exp_count: u8, c: impl Fn(Vec<f64>) -> f64, span: &Span,
         let actual_count_text = if actual_count == 1 {"argument"} else {"arguments"};
 
         Err(RawEvalError {
-            error: format!("Function '{name}' expected {exp_count} {exp_count_text}, but only got {actual_count} {actual_count_text}."),
-            span: span.clone()
+            error: format!("E1: Function '{name}' expected {exp_count} {exp_count_text}, but only got {actual_count} {actual_count_text}."),
+            span: span.clone(),
+            id: 1
         })
     }
 }
@@ -159,8 +164,9 @@ fn function_complex<T>(name: &str, exp_count: u8, mut c: impl FnMut(Vec<T>) -> R
         let actual_count_text = if actual_count == 1 {"argument"} else {"arguments"};
 
         Err(RawEvalError {
-            error: format!("Function '{name}' expected {exp_count} {exp_count_text}, but only got {actual_count} {actual_count_text}."),
-            span: span.clone()
+            error: format!("E1: Function '{name}' expected {exp_count} {exp_count_text}, but only got {actual_count} {actual_count_text}."),
+            span: span.clone(),
+            id: 1
         })
     }
 }
@@ -170,18 +176,32 @@ pub fn run(assignments: Vec<Assignment>, text: String, variables: &mut AHashMap<
 
     for assignment in assignments {
         let eval_result = eval(&assignment.expression, variables, ctx);
+        
+        if RESERVED_VARIABLE_NAMES.iter().any(|s| (&assignment.name.as_str() == s)) {
+           let loc = get_position_from_span(assignment.span, text.clone());
 
-        match eval_result {
-            Ok(value) => { variables.insert(assignment.name, value); },
-            Err(error) => {
-                let loc = get_position_from_span(error.span, text.clone());
+            errors.push(Error {
+                line_number: loc.0,
+                col_number: loc.1,
+                reason: format!("E4: Variable '{}' has the same name as reserved name '{}'.", assignment.name, assignment.name),
+                error_type: ErrorType::EvaluationError,
+                id: 4
+            });
+ 
+        } else {
+            match eval_result {
+                Ok(value) => { variables.insert(assignment.name, value); },
+                Err(error) => {
+                    let loc = get_position_from_span(error.span, text.clone());
 
-                errors.push(Error {
-                    line_number: loc.0,
-                    col_number: loc.1,
-                    reason: error.error,
-                    error_type: ErrorType::EvaluationError
-                });
+                    errors.push(Error {
+                        line_number: loc.0,
+                        col_number: loc.1,
+                        reason: error.error,
+                        error_type: ErrorType::EvaluationError,
+                        id: error.id
+                    });
+                }
             }
         }
     };
