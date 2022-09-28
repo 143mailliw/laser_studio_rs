@@ -88,7 +88,7 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
         x: 0.0,
         y: 0.0,
         index: 0.0,
-        count: 400.0,
+        count: 399.0,
         fraction: 0.0,
         pi: std::f64::consts::PI,
         tau: std::f64::consts::TAU,
@@ -108,7 +108,7 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
             ctx.index = index as f64;
             ctx.x = ((index % 20 - 10) * 10) as f64;
             ctx.y = ((index / 20 - 9) * 10) as f64;
-            ctx.fraction = index as f64 / 400.0;
+            ctx.fraction = index as f64 / 399.0;
 
             let mut hash_map = AHashMap::new();
         
