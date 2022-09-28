@@ -214,7 +214,7 @@ pub fn process_parser_error(error: Simple<char>, text: String) -> errors::Error 
         id: 255
     };
 
-    let mut found_character = error.found();
+    let found_character = error.found();
 
     let mut wants_semi = false;
     let mut wants_close_parens = false;
