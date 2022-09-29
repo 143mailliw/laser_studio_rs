@@ -140,7 +140,7 @@ fn eval(spanned_expr: &Spanned<Arc<Expr>>, variables: &mut AHashMap<String, f64>
 }
 
 fn function(name: &str, exp_count: u8, c: impl Fn(Vec<f64>) -> f64, span: &Span, arguments: Vec<f64>) -> Result<f64, RawEvalError> {
-    if arguments.len() == exp_count.into() {
+    if arguments.len() == exp_count as usize {
         Ok(c(arguments))
     } else {
         let actual_count = arguments.len();
@@ -156,7 +156,7 @@ fn function(name: &str, exp_count: u8, c: impl Fn(Vec<f64>) -> f64, span: &Span,
 }
 
 fn function_complex<T>(name: &str, exp_count: u8, mut c: impl FnMut(Vec<T>) -> Result<f64, RawEvalError>, span: &Span, arguments: Vec<T>) -> Result<f64, RawEvalError> {
-    if arguments.len() == exp_count.into() {
+    if arguments.len() == exp_count as usize {
         c(arguments)
     } else {
         let actual_count = arguments.len();

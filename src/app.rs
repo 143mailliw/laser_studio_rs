@@ -5,6 +5,10 @@ mod render;
 use eframe::egui;
 use egui::menu;
 use tracing::info;
+use rfd::{FileDialog, AsyncFileDialog};
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::BufReader;
 
 use crate::project;
 
@@ -65,15 +69,40 @@ impl eframe::App for LaserStudioApp {
                     if ui.button("New").clicked() {
                         self.project = project::Project::default();
                         self.tab = Workspace::Graphical;
+                        ui.close_menu();
                     }
                     if ui.button("Open").clicked() {
+                        
+                        // match open_project() {
+                        //     Ok(project) => { 
+                        //         self.project = project;
+                        //         ui.close_menu();
+                        //     },
+                        //     Err(_err) => {
+                        //         // TODO: show error dialog
+                        //     }
+                        // }
                         self.tab = Workspace::Graphical;
                     }
 
                     if self.tab != Workspace::Home {
                         ui.separator();
-                        if ui.button("Save").clicked() {}
-                        if ui.button("Save As").clicked() {}
+                        if ui.button("Save").clicked() {
+                            // match save_project(self.project.clone()) {
+                            //     Ok(_value) => { ui.close_menu(); },
+                            //     Err(_err) => {
+                            //         // TODO: show error dialog
+                            //     }
+                            // }                       
+                        }
+                        if ui.button("Save As").clicked() {
+                            // match save_project(self.project.clone()) {
+                            //     Ok(_value) => { ui.close_menu(); },
+                            //     Err(_err) => {
+                            //         // TODO: show error dialog
+                            //     }
+                            // }
+                        }
                         if ui.button("Export").clicked() {}
                     }
 
@@ -173,6 +202,12 @@ impl eframe::App for LaserStudioApp {
                             self.tab = Workspace::Graphical;
                         }
                         if ui.button("Open").clicked() {
+                            // match open_project() {
+                            //     Ok(project) => { self.project = project; },
+                            //     Err(_err) => {
+                            //         // TODO: show error dialog
+                            //     }
+                            // }
                             self.tab = Workspace::Graphical;
                         }
                     });
@@ -181,5 +216,58 @@ impl eframe::App for LaserStudioApp {
             }
         }
 
+    }
+}
+
+async fn open_project() -> std::result::Result<project::Project, String> {
+    let path_option = AsyncFileDialog::new()
+        .set_title("Open Project")
+        .add_filter("Laser Studio Project", &[".lsp"])
+        .pick_file()
+        .await;
+
+    let path = match path_option {
+        Some(value) => value,
+        None => return Err("No file was selected.".into())
+    };
+
+    let file = match File::open(path.path()) {
+        Ok(value) => value,
+        Err(_err) => return Err("An error occured while opening the file for reading.".into())
+    };
+
+    let reader = BufReader::new(file);
+
+    match serde_json::from_reader(reader) {
+        Ok(value) => Ok(value),
+        Err(_err) => return Err("An deserialization error occured.".into())
+    }
+}
+
+async fn save_project(project: project::Project) -> std::result::Result<(), String> {
+    let path_option = AsyncFileDialog::new()
+        .set_title("Save Project")
+        .add_filter("Laser Studio Project", &[".lsp"])
+        .save_file()
+        .await;
+
+    let path = match path_option {
+        Some(value) => value,
+        None => return Err("No file was selected.".into())
+    };
+
+    let serialized = match serde_json::to_string(&project) {
+        Ok(value) => value,
+        Err(_error) => return Err("A serialization error occured.".into())
+    };
+
+    let mut file = match File::create(path.path()) {
+        Ok(value) => value,
+        Err(_error) => return Err("Failed to create a new file.".into())
+    };
+
+    match file.write_all(serialized.as_bytes()) {
+        Ok(_value) => Ok(()),
+        Err(_error) => return Err("Failed to write to the file.".into())
     }
 }

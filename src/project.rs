@@ -1,6 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
+use serde::{Serialize, Deserialize};
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GraphicalPoint {
   r: u8,
   g: u8,
@@ -14,6 +15,7 @@ impl Default for GraphicalPoint {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct GraphicalData {
     pub last_update: u64,
     pub width: u16,
@@ -35,6 +37,7 @@ impl Default for GraphicalData {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TextData {
     pub last_update: u64,
     pub content: String
@@ -54,6 +57,7 @@ impl Default for TextData {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Project {
     pub last_update: u64,
     pub text_data: TextData,
