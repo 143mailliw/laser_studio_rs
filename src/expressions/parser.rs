@@ -104,7 +104,6 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .foldl(|left, ((_op, right), span)| (Expr::BinaryExpression((Arc::new(left.0), left.1.clone()), BinaryOperation::Exponent, (Arc::new(right.0), right.1)), left.1.start..span.end))
             .labelled("expression");
 
-
         let short_mul = num.clone()
             .then(short_mul_exp)
             .map(|(lhs, rhs)| (Expr::BinaryExpression((Arc::new(lhs.0), lhs.1.clone()), BinaryOperation::Multiply, (Arc::new(rhs.0), rhs.1.clone())), lhs.1.start..rhs.1.end));

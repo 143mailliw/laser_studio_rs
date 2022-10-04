@@ -25,7 +25,7 @@ pub struct RenderWorkspace {
     tools_tab: ToolsTab,
     tools_index_tb: String,
     tools_index_invalid: bool,
-    eval_frozen: bool
+    pub eval_frozen: bool
 }
 
 impl Default for RenderWorkspace {

@@ -78,7 +78,6 @@ pub fn update_text_workspace(ctx: &egui::Context, app: &mut super::LaserStudioAp
         let size_y = ui.available_size().y;
 
         egui::ScrollArea::vertical().show(ui, |ui| {
-            println!("i hate this: {:?}", ui.available_size());
             ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
             ui.horizontal(|ui| {
                 let mut num_frame = egui::Frame::default();
