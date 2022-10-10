@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 mod app;
 pub mod project;
 pub mod expressions;

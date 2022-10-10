@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 ahash = "0.8.0"
-chumsky = "0.8.0"
+chumsky = { git = "https://github.com/zesterer/chumsky" }
 eframe = "0.19.0"
 egui_extras = "0.19.0"
 rand = "0.8.5"
