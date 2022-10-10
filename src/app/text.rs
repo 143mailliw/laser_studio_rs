@@ -77,7 +77,7 @@ pub fn update_text_workspace(ctx: &egui::Context, app: &mut super::LaserStudioAp
     egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
         let size_y = ui.available_size().y;
 
-        egui::ScrollArea::vertical().show(ui, |ui| {
+        egui::ScrollArea::vertical().max_height(size_y).show(ui, |ui| {
             ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
             ui.horizontal(|ui| {
                 let mut num_frame = egui::Frame::default();

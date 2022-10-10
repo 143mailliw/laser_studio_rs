@@ -212,7 +212,7 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
             let eval_errors = app.render.eval_errors[index].clone();
             let parser_errors = app.render.parser_errors.clone();
 
-            ui.spacing_mut().item_spacing = egui::vec2(0.0, 6.0);
+            ui.spacing_mut().item_spacing = egui::vec2(0.0, 8.0);
             ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
             ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
             ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
@@ -222,7 +222,7 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                 .column(Size::exact(100.0))
                 .column(Size::remainder())
                 .striped(true)
-                .header(14.0, |mut header| {
+                .header(13.0, |mut header| {
                     header.col(|ui| {
                         ui.label("Type");
                     });
@@ -235,7 +235,7 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                 })
                 .body(|mut body| {
                     for error in eval_errors {
-                        body.row(14.0, |mut row| {
+                        body.row(13.0, |mut row| {
                             row.col(|ui| {
                                 ui.label("Runtime");
                             });
@@ -248,7 +248,7 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                         });
                     };
                     for error in parser_errors {
-                        body.row(14.0, |mut row| {
+                        body.row(13.0, |mut row| {
                             row.col(|ui| {
                                 ui.label("Parser");
                             });
@@ -291,16 +291,16 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
 
             let eval_variables: AHashMap<String, f64> = app.render.eval_variables[index].clone();
 
-            ui.spacing_mut().item_spacing = egui::vec2(0.0, 6.0);
             ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
             ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
             ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
-
+            ui.spacing_mut().item_spacing = egui::vec2(0.0, 8.0);
+            
             TableBuilder::new(ui)
                 .column(Size::exact(150.0))
                 .column(Size::remainder().at_least(150.0))
                 .striped(true)
-                .header(14.0, |mut header| {
+                .header(13.0, |mut header| {
                     header.col(|ui| {
                         ui.label("Name");
                     });
@@ -313,7 +313,7 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                     sorted.sort_by_key(|a| a.0);
 
                     for variable in sorted {
-                        body.row(14.0, |mut row| {
+                        body.row(13.0, |mut row| {
                             row.col(|ui| {
                                 ui.monospace(variable.0);
                             });
