@@ -57,12 +57,22 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
         .padded();
 
     let expr = recursive(|expr| {
-        let num = text::int(10)
+        let long_num = text::int(10)
             .chain::<char, _, _>(just('.').chain(text::digits(10)).or_not().flatten())
             .collect::<String>()
             .map(|s: String| Expr::Number(s.parse().unwrap()))
             .padded()
             .map_with_span(|expr, span: Span| (expr, span));
+
+        let short_num = just(".".to_string())
+            .chain::<char, _, _>(text::digits(10))
+            .collect::<String>()
+            .map(|s| Expr::Number(s.parse().unwrap()))
+            .padded()
+            .map_with_span(|expr, span: Span| (expr, span));
+
+        let num = long_num
+            .or(short_num);
 
         let variable_reference = ident
             .map(Expr::Variable)
@@ -80,10 +90,10 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .map(|(ident, vec)| Expr::Call(ident, vec.iter().map(|spanned| (Arc::new(spanned.0.clone()), spanned.1.clone())).collect()))
             .map_with_span(|expr, span: Span| (expr, span));
 
-        // TODO: this sucks, find a better way to do this that doesn't suck
         let op = |c| just(c).padded();
         let dc_op = |c, c2| just(c).then(just(c2)).padded();
 
+        // TODO: this sucks, find a better way to do this that doesn't suck
         let short_mul_rhs = call.clone()
             .or(group.clone())
             .or(variable_reference.clone());
