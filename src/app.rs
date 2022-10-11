@@ -34,7 +34,8 @@ pub struct LaserStudioApp {
     pub text: text::TextWorkspace,
     render: render::RenderWorkspace,
     project_rx: mpsc::Receiver<FileDialogSelection>,
-    project_tx: mpsc::Sender<FileDialogSelection>
+    project_tx: mpsc::Sender<FileDialogSelection>,
+    show_about_window: bool
 }
 
 impl Default for LaserStudioApp {
@@ -48,7 +49,8 @@ impl Default for LaserStudioApp {
             text: text::TextWorkspace::default(),
             render: render::RenderWorkspace::default(),
             project_rx: rx,
-            project_tx: tx
+            project_tx: tx,
+            show_about_window: false
         }
     }
 }
@@ -57,6 +59,19 @@ impl eframe::App for LaserStudioApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // check for any new project updates before rendering anything
         self.check_for_selection();
+
+        // handle about window
+        let about_window = egui::Window::new("About Laser Studio")
+            .open(&mut self.show_about_window)
+            .resizable(false);
+
+        about_window.show(ctx, |ui| {
+            ui.heading("Laser Studio");
+            ui.label("Version 3.0");
+            ui.separator();
+            ui.label("Licensed under the Apache License, version 2.0.");
+            ui.label("© 2020-2022 william341.");
+        });
 
         let mut frame = egui::Frame::default();
 
@@ -76,11 +91,7 @@ impl eframe::App for LaserStudioApp {
                 ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
 
                 ui.menu_button("File", |ui| {
-                    ui.spacing_mut().button_padding = egui::vec2(8.0, 4.0);
-                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
-                    ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
-                    ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
-                    ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
+                    LaserStudioApp::menu_button_styling(ui);
 
                     if ui.button("New").clicked() {
                         self.project = project::Project::default();
@@ -114,11 +125,7 @@ impl eframe::App for LaserStudioApp {
 
                 if self.tab != Workspace::Home {
                     ui.menu_button("Edit", |ui| {
-                        ui.spacing_mut().button_padding = egui::vec2(8.0, 4.0);
-                        ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
-                        ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
-                        ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
-                        ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
+                        LaserStudioApp::menu_button_styling(ui);
 
                         if ui.button("Undo").clicked() {}
                         if ui.button("Redo").clicked() {}
@@ -132,11 +139,7 @@ impl eframe::App for LaserStudioApp {
 
                 if self.tab != Workspace::Home {
                     ui.menu_button("Run", |ui| {
-                        ui.spacing_mut().button_padding = egui::vec2(8.0, 4.0);
-                        ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
-                        ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
-                        ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
-                        ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
+                        LaserStudioApp::menu_button_styling(ui);
 
                         if ui.button("Run").clicked() {
                             self.render.eval_frozen = false;
@@ -149,6 +152,18 @@ impl eframe::App for LaserStudioApp {
                         }
                     });
                 }
+
+                ui.menu_button("Help", |ui| {
+                    LaserStudioApp::menu_button_styling(ui);
+
+                    if ui.button("Documentation").clicked() {
+
+                    }
+
+                    if ui.button("About Laser Studio").clicked() {
+                        self.show_about_window = true;
+                    }
+                });
 
                 ui.spacing_mut().item_spacing.x = 3.0;
 
@@ -190,7 +205,7 @@ impl eframe::App for LaserStudioApp {
             _ => {
                 egui::SidePanel::left("about").resizable(false).min_width(200.0).show(ctx, |ui| {
                     ui.heading("Laser Studio");
-                    ui.label("3.0");
+                    ui.label("Version 3.0");
                     ui.separator();
                     ui.label("Licensed under the Apache License, version 2.0.");
                     ui.label("© 2020-2022 william341.");
@@ -314,5 +329,13 @@ impl LaserStudioApp {
             Ok(_value) => Ok(()),
             Err(_error) => return Err("Failed to write to the file.".into())
         }
+    }
+    
+    fn menu_button_styling(ui: &mut egui::Ui) {
+        ui.spacing_mut().button_padding = egui::vec2(8.0, 4.0);
+        ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+        ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
+        ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
+        ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
     }
 }
