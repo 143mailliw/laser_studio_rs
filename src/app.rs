@@ -35,7 +35,9 @@ pub struct LaserStudioApp {
     render: render::RenderWorkspace,
     project_rx: mpsc::Receiver<FileDialogSelection>,
     project_tx: mpsc::Sender<FileDialogSelection>,
-    show_about_window: bool
+    show_about_window: bool,
+    show_documentation_window: bool,
+    current_path: Option<PathBuf>
 }
 
 impl Default for LaserStudioApp {
@@ -50,7 +52,9 @@ impl Default for LaserStudioApp {
             render: render::RenderWorkspace::default(),
             project_rx: rx,
             project_tx: tx,
-            show_about_window: false
+            show_about_window: false,
+            show_documentation_window: false,
+            current_path: None
         }
     }
 }
@@ -59,6 +63,7 @@ impl eframe::App for LaserStudioApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // check for any new project updates before rendering anything
         self.check_for_selection();
+        self.handle_keybinds(ctx);
 
         // handle about window
         let about_window = egui::Window::new("About Laser Studio")
@@ -106,7 +111,7 @@ impl eframe::App for LaserStudioApp {
                     if self.tab != Workspace::Home {
                         ui.separator();
                         if ui.button("Save").clicked() {
-                            self.save_dialog();
+                            self.save_current_project();
                             ui.close_menu();
                         }
                         if ui.button("Save As").clicked() {
@@ -337,5 +342,30 @@ impl LaserStudioApp {
         ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
         ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
         ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
+    }
+
+    fn save_current_project(&mut self) {
+        match self.current_path.clone() {
+            Some(value) => { 
+                match LaserStudioApp::save_project(value, self.project.clone()) {
+                    Ok(_) => (),
+                    Err(_err) => () // TODO: show error
+                }
+            }
+            None => { self.save_dialog() }
+        };
+    }
+
+    fn handle_keybinds(&mut self, ctx: &egui::Context) {
+        let input = ctx.input();
+
+        if input.modifiers.ctrl && input.key_down(egui::Key::S) {
+            self.save_current_project();
+        }
+
+        if input.key_down(egui::Key::F5) {
+            self.tab = Workspace::Render;
+            self.render.eval_frozen = false;
+        }
     }
 }
