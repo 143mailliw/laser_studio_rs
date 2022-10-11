@@ -1,17 +1,22 @@
+use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct GraphicalPoint {
-  r: u8,
-  g: u8,
-  b: u8,
-  active: bool
+    r: u8,
+    g: u8,
+    b: u8,
+    active: bool,
 }
 
 impl Default for GraphicalPoint {
     fn default() -> Self {
-        Self { r: 255, g: 255, b: 255, active: false }
+        Self {
+            r: 255,
+            g: 255,
+            b: 255,
+            active: false,
+        }
     }
 }
 
@@ -20,19 +25,19 @@ pub struct GraphicalData {
     pub last_update: u64,
     pub width: u16,
     pub height: u16,
-    pub points: Vec<GraphicalPoint>
+    pub points: Vec<GraphicalPoint>,
 }
 
 impl Default for GraphicalData {
     fn default() -> Self {
-        Self { 
+        Self {
             last_update: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("time went backwards")
                 .as_secs(),
             width: 20,
             height: 20,
-            points: vec![GraphicalPoint::default(); 400]
+            points: vec![GraphicalPoint::default(); 400],
         }
     }
 }
@@ -40,7 +45,7 @@ impl Default for GraphicalData {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TextData {
     pub last_update: u64,
-    pub content: String
+    pub content: String,
 }
 
 impl Default for TextData {
@@ -52,7 +57,8 @@ impl Default for TextData {
                 .as_secs(),
             content: " 
                 # This is some test content.
-                ".to_string()
+                "
+            .to_string(),
         }
     }
 }
@@ -61,9 +67,8 @@ impl Default for TextData {
 pub struct Project {
     pub last_update: u64,
     pub text_data: TextData,
-    pub graphical_data: GraphicalData
+    pub graphical_data: GraphicalData,
 }
-
 
 impl Default for Project {
     fn default() -> Self {
@@ -73,7 +78,7 @@ impl Default for Project {
                 .expect("time went backwards")
                 .as_secs(),
             text_data: TextData::default(),
-            graphical_data: GraphicalData::default()
+            graphical_data: GraphicalData::default(),
         }
     }
 }

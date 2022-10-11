@@ -1,6 +1,6 @@
+use super::errors;
 use chumsky::prelude::*;
 use std::sync::Arc;
-use super::errors;
 pub type Span = std::ops::Range<usize>;
 pub type Spanned<T> = (T, Span);
 
@@ -19,13 +19,13 @@ pub enum BinaryOperation {
     GreaterThanOrEqual,
     Equal,
     And,
-    Or
+    Or,
 }
 
 #[derive(Debug, Clone)]
 pub enum UnaryOperation {
     Negate,
-    Not
+    Not,
 }
 
 #[derive(Debug, Clone)]
@@ -40,14 +40,14 @@ pub enum Expr {
     UnaryExpression(UnaryOperation, Spanned<Arc<Expr>>),
 
     // Function Call
-    Call(String, Vec<Spanned<Arc<Expr>>>)
+    Call(String, Vec<Spanned<Arc<Expr>>>),
 }
 
 #[derive(Debug, Clone)]
 pub struct Assignment {
     pub name: String,
     pub expression: Spanned<Arc<Expr>>,
-    pub span: Span
+    pub span: Span,
 }
 
 pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
@@ -71,30 +71,42 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .padded()
             .map_with_span(|expr, span: Span| (expr, span));
 
-        let num = long_num
-            .or(short_num);
+        let num = long_num.or(short_num);
 
         let variable_reference = ident
             .map(Expr::Variable)
             .map_with_span(|expr, span: Span| (expr, span));
 
-        let group = expr.clone()
+        let group = expr
+            .clone()
             .delimited_by(just('('), just(')'))
             .padded()
             .map(|expr: Spanned<Expr>| Expr::Group((Arc::new(expr.0), expr.1)))
             .map_with_span(|expr, span: Span| (expr, span));
 
         let call = ident
-            .then(expr.clone().separated_by(just(",")).delimited_by(just('('), just(')')))
+            .then(
+                expr.clone()
+                    .separated_by(just(","))
+                    .delimited_by(just('('), just(')')),
+            )
             .padded()
-            .map(|(ident, vec)| Expr::Call(ident, vec.iter().map(|spanned| (Arc::new(spanned.0.clone()), spanned.1.clone())).collect()))
+            .map(|(ident, vec)| {
+                Expr::Call(
+                    ident,
+                    vec.iter()
+                        .map(|spanned| (Arc::new(spanned.0.clone()), spanned.1.clone()))
+                        .collect(),
+                )
+            })
             .map_with_span(|expr, span: Span| (expr, span));
 
         let op = |c| just(c).padded();
         let dc_op = |c, c2| just(c).then(just(c2)).padded();
 
         // TODO: this sucks, find a better way to do this that doesn't suck
-        let short_mul_rhs = call.clone()
+        let short_mul_rhs = call
+            .clone()
             .or(group.clone())
             .or(variable_reference.clone());
 
@@ -102,82 +114,176 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .map_with_span(|expr, span: Span| (expr, span))
             .repeated()
             .then(short_mul_rhs.clone().or(num.clone()))
-            .foldr(|op, right| (Expr::UnaryExpression(UnaryOperation::Negate, (Arc::new(right.0), right.1.clone())), op.1.start..right.1.end))
+            .foldr(|op, right| {
+                (
+                    Expr::UnaryExpression(
+                        UnaryOperation::Negate,
+                        (Arc::new(right.0), right.1.clone()),
+                    ),
+                    op.1.start..right.1.end,
+                )
+            })
             .labelled("expression");
 
-        let short_mul_exp = short_mul_rhs.clone()
-            .then(op('^')
-                .to(BinaryOperation::Exponent)
-                .then(short_mul_neg)
-                .map_with_span(|expr, span: Span| (expr, span))
-                .repeated())
-            .foldl(|left, ((_op, right), span)| (Expr::BinaryExpression((Arc::new(left.0), left.1.clone()), BinaryOperation::Exponent, (Arc::new(right.0), right.1)), left.1.start..span.end))
+        let short_mul_exp = short_mul_rhs
+            .clone()
+            .then(
+                op('^')
+                    .to(BinaryOperation::Exponent)
+                    .then(short_mul_neg)
+                    .map_with_span(|expr, span: Span| (expr, span))
+                    .repeated(),
+            )
+            .foldl(|left, ((_op, right), span)| {
+                (
+                    Expr::BinaryExpression(
+                        (Arc::new(left.0), left.1.clone()),
+                        BinaryOperation::Exponent,
+                        (Arc::new(right.0), right.1),
+                    ),
+                    left.1.start..span.end,
+                )
+            })
             .labelled("expression");
 
-        let short_mul = num.clone()
-            .then(short_mul_exp)
-            .map(|(lhs, rhs)| (Expr::BinaryExpression((Arc::new(lhs.0), lhs.1.clone()), BinaryOperation::Multiply, (Arc::new(rhs.0), rhs.1.clone())), lhs.1.start..rhs.1.end));
+        let short_mul = num.clone().then(short_mul_exp).map(|(lhs, rhs)| {
+            (
+                Expr::BinaryExpression(
+                    (Arc::new(lhs.0), lhs.1.clone()),
+                    BinaryOperation::Multiply,
+                    (Arc::new(rhs.0), rhs.1.clone()),
+                ),
+                lhs.1.start..rhs.1.end,
+            )
+        });
 
-        let atom = short_mul
-            .or(num)
-            .or(call)
-            .or(group)
-            .or(variable_reference);
+        let atom = short_mul.or(num).or(call).or(group).or(variable_reference);
 
-        let unary = op('-').to(UnaryOperation::Negate)
+        let unary = op('-')
+            .to(UnaryOperation::Negate)
             .or(op('!').to(UnaryOperation::Not))
             .map_with_span(|expr, span: Span| (expr, span))
             .repeated()
             .then(atom)
-            .foldr(|op, right| (Expr::UnaryExpression(op.0, (Arc::new(right.0), right.1.clone())), op.1.start..right.1.end))
+            .foldr(|op, right| {
+                (
+                    Expr::UnaryExpression(op.0, (Arc::new(right.0), right.1.clone())),
+                    op.1.start..right.1.end,
+                )
+            })
             .labelled("expression");
 
-        let binary_first = unary.clone()
-            .then(op('^').to(BinaryOperation::Exponent)
-                .then(unary)
-                .map_with_span(|expr, span: Span| (expr, span))
-                .repeated())
-            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Arc::new(left.0), left.1.clone()), op, (Arc::new(right.0), right.1)), left.1.start..span.end))
+        let binary_first = unary
+            .clone()
+            .then(
+                op('^')
+                    .to(BinaryOperation::Exponent)
+                    .then(unary)
+                    .map_with_span(|expr, span: Span| (expr, span))
+                    .repeated(),
+            )
+            .foldl(|left, ((op, right), span)| {
+                (
+                    Expr::BinaryExpression(
+                        (Arc::new(left.0), left.1.clone()),
+                        op,
+                        (Arc::new(right.0), right.1),
+                    ),
+                    left.1.start..span.end,
+                )
+            })
             .labelled("expression");
 
-        let binary_second = binary_first.clone()
-            .then(op('*').to(BinaryOperation::Multiply)
-                .or(op('/').to(BinaryOperation::Divide))
-                .or(op('%').to(BinaryOperation::Modulo))
-                .then(binary_first) 
-                .map_with_span(|expr, span: Span| (expr, span))
-                .repeated())
-            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Arc::new(left.0), left.1.clone()), op, (Arc::new(right.0), right.1)), left.1.start..span.end))
+        let binary_second = binary_first
+            .clone()
+            .then(
+                op('*')
+                    .to(BinaryOperation::Multiply)
+                    .or(op('/').to(BinaryOperation::Divide))
+                    .or(op('%').to(BinaryOperation::Modulo))
+                    .then(binary_first)
+                    .map_with_span(|expr, span: Span| (expr, span))
+                    .repeated(),
+            )
+            .foldl(|left, ((op, right), span)| {
+                (
+                    Expr::BinaryExpression(
+                        (Arc::new(left.0), left.1.clone()),
+                        op,
+                        (Arc::new(right.0), right.1),
+                    ),
+                    left.1.start..span.end,
+                )
+            })
             .labelled("expression");
 
-        let binary_third = binary_second.clone()
-            .then(op('+').to(BinaryOperation::Add)
-                .or(op('-').to(BinaryOperation::Subtract))
-                .then(binary_second)
-                .map_with_span(|expr, span: Span| (expr, span))
-                .repeated())
-            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Arc::new(left.0), left.1.clone()), op, (Arc::new(right.0), right.1)), left.1.start..span.end))
+        let binary_third = binary_second
+            .clone()
+            .then(
+                op('+')
+                    .to(BinaryOperation::Add)
+                    .or(op('-').to(BinaryOperation::Subtract))
+                    .then(binary_second)
+                    .map_with_span(|expr, span: Span| (expr, span))
+                    .repeated(),
+            )
+            .foldl(|left, ((op, right), span)| {
+                (
+                    Expr::BinaryExpression(
+                        (Arc::new(left.0), left.1.clone()),
+                        op,
+                        (Arc::new(right.0), right.1),
+                    ),
+                    left.1.start..span.end,
+                )
+            })
             .labelled("expression");
 
-        let logical_first = binary_third.clone()
-            .then(dc_op('<', '=').to(BinaryOperation::LessThanOrEqual)
-                .or(dc_op('>', '=').to(BinaryOperation::GreaterThanOrEqual))
-                .or(dc_op('=', '=').to(BinaryOperation::Equal))
-                .or(op('<').to(BinaryOperation::LessThan))
-                .or(op('>').to(BinaryOperation::GreaterThan))
-                .then(binary_third)
-                .map_with_span(|expr, span: Span| (expr, span))
-                .repeated())
-            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Arc::new(left.0), left.1.clone()), op, (Arc::new(right.0), right.1)), left.1.start..span.end))
+        let logical_first = binary_third
+            .clone()
+            .then(
+                dc_op('<', '=')
+                    .to(BinaryOperation::LessThanOrEqual)
+                    .or(dc_op('>', '=').to(BinaryOperation::GreaterThanOrEqual))
+                    .or(dc_op('=', '=').to(BinaryOperation::Equal))
+                    .or(op('<').to(BinaryOperation::LessThan))
+                    .or(op('>').to(BinaryOperation::GreaterThan))
+                    .then(binary_third)
+                    .map_with_span(|expr, span: Span| (expr, span))
+                    .repeated(),
+            )
+            .foldl(|left, ((op, right), span)| {
+                (
+                    Expr::BinaryExpression(
+                        (Arc::new(left.0), left.1.clone()),
+                        op,
+                        (Arc::new(right.0), right.1),
+                    ),
+                    left.1.start..span.end,
+                )
+            })
             .labelled("expression");
 
-        let logical_last = logical_first.clone()
-            .then(op('&').to(BinaryOperation::And)
-                .or(op('|').to(BinaryOperation::Or))
-                .then(logical_first)
-                .map_with_span(|expr, span: Span| (expr, span))
-                .repeated())
-            .foldl(|left, ((op, right), span)| (Expr::BinaryExpression((Arc::new(left.0), left.1.clone()), op, (Arc::new(right.0), right.1)), left.1.start..span.end))
+        let logical_last = logical_first
+            .clone()
+            .then(
+                op('&')
+                    .to(BinaryOperation::And)
+                    .or(op('|').to(BinaryOperation::Or))
+                    .then(logical_first)
+                    .map_with_span(|expr, span: Span| (expr, span))
+                    .repeated(),
+            )
+            .foldl(|left, ((op, right), span)| {
+                (
+                    Expr::BinaryExpression(
+                        (Arc::new(left.0), left.1.clone()),
+                        op,
+                        (Arc::new(right.0), right.1),
+                    ),
+                    left.1.start..span.end,
+                )
+            })
             .labelled("expression");
 
         logical_last
@@ -193,7 +299,7 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
         .map(|((name, right), span)| Assignment {
             name,
             expression: (Arc::new(right.0), right.1),
-            span
+            span,
         })
         .labelled("variable assignment");
 
@@ -218,7 +324,7 @@ pub fn process_parser_error(error: Simple<char>, text: String) -> errors::Error 
         col_number: loc.1,
         error_type: errors::ErrorType::ParseError,
         reason: "P255: Unexpected parser error.".to_string(),
-        id: 255
+        id: 255,
     };
 
     let found_character = error.found();
@@ -229,28 +335,33 @@ pub fn process_parser_error(error: Simple<char>, text: String) -> errors::Error 
 
     let got_none = found_character == None;
 
-    error
-        .expected()
-        .for_each(|want| {
-            match want {
-                Some(';') => wants_semi = true,
-                Some(')') => wants_close_parens = true,
-                Some('\n') => wants_new_line = true,
-                _ => ()
-            }
-        });
+    error.expected().for_each(|want| match want {
+        Some(';') => wants_semi = true,
+        Some(')') => wants_close_parens = true,
+        Some('\n') => wants_new_line = true,
+        _ => (),
+    });
 
     if got_none {
         processed_error.reason = "P2: Unexpected end of file.".into();
         processed_error.id = 2;
     } else if wants_semi {
-        processed_error.reason = format!("P3: Unexpected character '{}'. Perhaps you forgot a semi-colon?", found_character.unwrap_or(&'_'));
+        processed_error.reason = format!(
+            "P3: Unexpected character '{}'. Perhaps you forgot a semi-colon?",
+            found_character.unwrap_or(&'_')
+        );
         processed_error.id = 4;
     } else if wants_close_parens {
-        processed_error.reason = format!("P4: Unexpected character '{}'. Perhaps you forgot to close your parenthesis?", found_character.unwrap_or(&'_'));
+        processed_error.reason = format!(
+            "P4: Unexpected character '{}'. Perhaps you forgot to close your parenthesis?",
+            found_character.unwrap_or(&'_')
+        );
         processed_error.id = 5;
     } else {
-        processed_error.reason = format!("P1: Unexpected character '{}'.", found_character.unwrap_or(&'_'));
+        processed_error.reason = format!(
+            "P1: Unexpected character '{}'.",
+            found_character.unwrap_or(&'_')
+        );
         processed_error.id = 0;
     }
 
