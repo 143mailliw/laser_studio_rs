@@ -75,7 +75,7 @@ pub fn on_switch_render(app: &mut super::LaserStudioApp) {
         .expect("time went backwards");
 }
 
-fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<RenderedPoint> {
+fn calculate_points(workspace: &mut RenderWorkspace, text: String, x_size: u16, y_size: u16) -> Vec<RenderedPoint> {
     let time = time::SystemTime::now()
         .duration_since(time::SystemTime::UNIX_EPOCH)
         .expect("time went backwards")
@@ -87,7 +87,7 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
         x: 0.0,
         y: 0.0,
         index: 0.0,
-        count: 399.0,
+        count: (x_size * y_size - 1) as f64,
         fraction: 0.0,
         pi: std::f64::consts::PI,
         tau: std::f64::consts::TAU,
@@ -99,19 +99,19 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
     workspace.eval_errors = vec![];
     workspace.eval_variables = vec![];
 
-    let points: Vec<(AHashMap<String, f64>, Vec<errors::Error>, eval::EvalContext)> = (0..400)
+    let points: Vec<(AHashMap<String, f64>, Vec<errors::Error>, eval::EvalContext)> = (0..(x_size * y_size))
         .into_par_iter()
         .map(|index| {
             let mut ctx = base_ctx.clone();
 
             let f_index = index as f64;
-            let x_size = 20.0;
-            let y_size = 20.0;
+            let x_size = x_size as f64;
+            let y_size = y_size as f64;
 
             ctx.index = f_index;
-            ctx.x = (f_index % x_size - 0.5 * x_size + 0.5) * (200.0/x_size) * (1.0 + 1.0/(x_size - 1.0));
-            ctx.y = (0.5 + f64::floor(f_index/y_size - 0.5 * y_size)) * (200.0/y_size) * (1.0 + 1.0/(y_size - 1.0)) * -1.0;
-            ctx.fraction = f_index / 399.0;
+            ctx.x = -100.0 + (f_index % x_size)*(200.0/(x_size - 1.0));
+            ctx.y = 100.0 - (200.0/(y_size - 1.0)) * f64::floor(f_index / x_size);
+            ctx.fraction = f_index / ctx.count;
 
             let mut hash_map = AHashMap::new();
 
@@ -219,12 +219,37 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                         app.render.tools_tab = ToolsTab::Inspector;
                     };
 
-                    ui.with_layout(egui::Layout::bottom_up(egui::Align::RIGHT), |ui| {
-                        let value = egui::DragValue::new(&mut app.render.tools_index_tb)
-                            .clamp_range(0..=399)
-                            .prefix("viewing index: ");
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::BOTTOM), |ui| {
+                        if app.render.tools_tab != ToolsTab::Hidden {
+                            let index_value = egui::DragValue::new(&mut app.render.tools_index_tb)
+                                .clamp_range(0..=399)
+                                .prefix("inspecting index: ");
 
-                        ui.add(value);
+                            ui.add(index_value);
+
+                            ui.separator();
+                        }
+
+                        let y_value = egui::DragValue::new(&mut app.project.text_data.size_y)
+                            .clamp_range(2..=20);
+
+                        ui.add(y_value);
+
+                        let mut frame = egui::Frame::default();
+                        frame.inner_margin = egui::style::Margin {bottom: 3.0, left: 0.0, right: 0.0, top: 0.0};
+
+                        frame.clone().show(ui, |ui| {
+                            ui.monospace("by ");
+                        });
+
+                        let x_value = egui::DragValue::new(&mut app.project.text_data.size_x)
+                            .clamp_range(2..=20);
+                        
+                        ui.add(x_value);
+
+                        frame.show(ui, |ui| {
+                            ui.monospace("rectangular grid, ")
+                        });
                     });
                 });
             });
@@ -370,7 +395,7 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
 
     if !app.render.eval_frozen {
         app.render.eval_result =
-            calculate_points(&mut app.render, app.project.text_data.content.clone());
+            calculate_points(&mut app.render, app.project.text_data.content.clone(), app.project.text_data.size_x as u16, app.project.text_data.size_y as u16);
     }
 
     let mut frame = egui::Frame::default();
