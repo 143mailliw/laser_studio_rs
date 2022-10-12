@@ -1,84 +1,36 @@
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct GraphicalPoint {
-    r: u8,
-    g: u8,
-    b: u8,
-    active: bool,
-}
-
-impl Default for GraphicalPoint {
-    fn default() -> Self {
-        Self {
-            r: 255,
-            g: 255,
-            b: 255,
-            active: false,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct GraphicalData {
-    pub last_update: u64,
-    pub width: u16,
-    pub height: u16,
-    pub points: Vec<GraphicalPoint>,
-}
-
-impl Default for GraphicalData {
-    fn default() -> Self {
-        Self {
-            last_update: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("time went backwards")
-                .as_secs(),
-            width: 20,
-            height: 20,
-            points: vec![GraphicalPoint::default(); 400],
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TextData {
-    pub last_update: u64,
     pub content: String,
+    pub size_x: u8,
+    pub size_y: u8
 }
 
 impl Default for TextData {
     fn default() -> Self {
         Self {
-            last_update: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("time went backwards")
-                .as_secs(),
             content: " 
                 # This is some test content.
                 "
             .to_string(),
+            size_y: 20,
+            size_x: 20
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Project {
-    pub last_update: u64,
+    pub version: u16,
     pub text_data: TextData,
-    pub graphical_data: GraphicalData,
 }
 
 impl Default for Project {
     fn default() -> Self {
         Self {
-            last_update: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("time went backwards")
-                .as_secs(),
+            version: 2,
             text_data: TextData::default(),
-            graphical_data: GraphicalData::default(),
         }
     }
 }

@@ -105,8 +105,8 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String) -> Vec<Render
             let mut ctx = base_ctx.clone();
 
             ctx.index = index as f64;
-            ctx.x = ((index % 20 - 10) * 10) as f64;
-            ctx.y = ((index / 20 - 9) * 10) as f64;
+            ctx.x = (index % 20 - 10) as f64 * (200.0/20.0);
+            ctx.y = (index / 20 - 9) as f64 * (200.0/20.0);
             ctx.fraction = index as f64 / 399.0;
 
             let mut hash_map = AHashMap::new();

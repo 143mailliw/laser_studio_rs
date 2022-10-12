@@ -1,4 +1,3 @@
-mod graphical;
 mod render;
 mod text;
 
@@ -17,7 +16,6 @@ use tracing::info;
 #[derive(PartialEq)]
 enum Workspace {
     Home,
-    Graphical,
     Text,
     Render,
 }
@@ -30,7 +28,6 @@ enum FileDialogSelection {
 pub struct LaserStudioApp {
     tab: Workspace,
     project: project::Project,
-    graphical: graphical::GraphicalWorkspaceState,
     pub text: text::TextWorkspace,
     render: render::RenderWorkspace,
     project_rx: mpsc::Receiver<FileDialogSelection>,
@@ -47,7 +44,6 @@ impl Default for LaserStudioApp {
         Self {
             tab: Workspace::Home,
             project: project::Project::default(),
-            graphical: graphical::GraphicalWorkspaceState::default(),
             text: text::TextWorkspace::default(),
             render: render::RenderWorkspace::default(),
             project_rx: rx,
@@ -102,7 +98,7 @@ impl eframe::App for LaserStudioApp {
 
                         if ui.button("New").clicked() {
                             self.project = project::Project::default();
-                            self.tab = Workspace::Graphical;
+                            self.tab = Workspace::Text;
                             ui.close_menu();
                         }
                         if ui.button("Open").clicked() {
@@ -195,13 +191,7 @@ impl eframe::App for LaserStudioApp {
                         ui.label("Home");
                     } else {
                         if ui
-                            .selectable_label(self.tab == Workspace::Graphical, "Graphical")
-                            .clicked()
-                        {
-                            self.tab = Workspace::Graphical;
-                        }
-                        if ui
-                            .selectable_label(self.tab == Workspace::Text, "Text")
+                            .selectable_label(self.tab == Workspace::Text, "Edit")
                             .clicked()
                         {
                             self.tab = Workspace::Text;
@@ -219,7 +209,6 @@ impl eframe::App for LaserStudioApp {
 
         match self.tab {
             Workspace::Text => text::update_text_workspace(ctx, self),
-            Workspace::Graphical => graphical::update_graphical_workspace(ctx, self),
             Workspace::Render => render::update_render_workspace(ctx, self),
             _ => {
                 egui::SidePanel::left("about")
@@ -236,7 +225,7 @@ impl eframe::App for LaserStudioApp {
                     ui.horizontal(|ui| {
                         if ui.button("New").clicked() {
                             self.project = project::Project::default();
-                            self.tab = Workspace::Graphical;
+                            self.tab = Workspace::Text;
                         }
                         if ui.button("Open").clicked() {
                             self.open_dialog();
@@ -259,7 +248,7 @@ impl LaserStudioApp {
                         match LaserStudioApp::open_project(value) {
                             Ok(value) => {
                                 self.project = value;
-                                self.tab = Workspace::Graphical;
+                                self.tab = Workspace::Text;
                             }
                             Err(_err) => {} // TODO: show error dialog
                         };
