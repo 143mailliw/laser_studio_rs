@@ -138,7 +138,7 @@ fn eval(
                         "lerp" => function(
                             "lerp",
                             3,
-                            |args| (args[1] * args[0] + args[2] * (1.0 - args[0])),
+                            |args| (args[1] * args[0] + args[2] * (1.0 - args[0])) * -1,
                             span,
                             arguments,
                         ),
