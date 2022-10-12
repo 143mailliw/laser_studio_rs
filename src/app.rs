@@ -360,7 +360,7 @@ impl LaserStudioApp {
     fn handle_keybinds(&mut self, ctx: &egui::Context) {
         let input = ctx.input();
 
-        if input.modifiers.ctrl && input.key_down(egui::Key::S) {
+        if input.modifiers.ctrl && input.key_pressed(egui::Key::S) {
             self.save_current_project();
         }
 
