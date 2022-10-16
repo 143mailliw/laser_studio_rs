@@ -29,7 +29,7 @@ The `count` input specifies the amount of lasers being rendered.
 
 On a rectangluar grid, this variable is equivalent to the following expression:
 ```
-x_size * y_size - 1
+x_size * y_size
 ```
 
 ## `fraction`
@@ -37,23 +37,17 @@ The `fraction` input provides a fraction representing the ratio between the curr
 
 This variable is equivalent to the following expression:
 ```
-index / count
+index / (count - 1)
 ```
 
 ## `time`
-The `time` input specifies the current time on your computer, in seconds.
-
-In Tower Unite, this is your local time. On Laser Studio, this is currently UTC.
+The `time` input specifies the current time on your computer, in seconds, in local time (the time on your computer).
 
 ## `projectionStartTime`
-The `projectionStartTime` input specifies the time that the expression started running, in seconds.
-
-As with the `time` input, this is based on your local time in Tower Unite, and UTC on Laser Studio.
+The `projectionStartTime` input specifies the time that the expression started running, in seconds, in local time (the time on your computer).
 
 ## `projectionTime`
-The `projectionTime` input specifies the time since the expression start running, in seconds.
-
-As with the `time` input, this is based on your local time in Tower Unite, and UTC on Laser Studio.
+The `projectionTime` input specifies the time since the expression start running, in seconds, in local time (the time on your computer).
 
 This variable is equivalent to the following expression:
 ```
@@ -61,7 +55,7 @@ time - projectionStartTime
 ```
 
 ## `pi`
-Pi. Equivalent to typing out 3.1415926535898...
+The `pi` input specifies the value of pi.
 
 ## `tau`
-Double pi. Equivalent to typing out `2 * pi` or 6.2831853071796...
+The `tau` input specifies the value of tau (2 * pi).

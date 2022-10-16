@@ -5,7 +5,7 @@ use eframe::egui;
 use eframe::egui::plot;
 use egui_extras::{Size, TableBuilder};
 use rayon::prelude::*;
-use std::time;
+use chrono::{Local, DateTime};
 
 #[derive(PartialEq)]
 pub enum ToolsTab {
@@ -20,7 +20,7 @@ pub struct RenderWorkspace {
     eval_errors: Vec<Vec<errors::Error>>,
     eval_variables: Vec<AHashMap<String, f64>>,
     eval_result: Vec<RenderedPoint>,
-    projection_start_time: time::Duration,
+    projection_start_time: DateTime<Local>,
     tools_tab: ToolsTab,
     tools_index_tb: u16,
     pub eval_frozen: bool,
@@ -34,9 +34,7 @@ impl Default for RenderWorkspace {
             eval_errors: vec![],
             eval_variables: vec![],
             eval_result: vec![],
-            projection_start_time: time::SystemTime::now()
-                .duration_since(time::UNIX_EPOCH)
-                .expect("time went backwards"),
+            projection_start_time: Local::now(),
             tools_tab: ToolsTab::Hidden,
             tools_index_tb: 0,
             eval_frozen: false,
@@ -71,24 +69,19 @@ impl RenderWorkspace {
             }
         };
 
-        self.projection_start_time = time::SystemTime::now()
-        .duration_since(time::UNIX_EPOCH)
-        .expect("time went backwards");
+        self.projection_start_time = Local::now();
     }
 
     fn calculate_points(&mut self, text: String, x_size: u16, y_size: u16) -> Vec<RenderedPoint> {
-        let time = time::SystemTime::now()
-        .duration_since(time::SystemTime::UNIX_EPOCH)
-        .expect("time went backwards")
-        .as_secs_f64();
+        let time = Local::now().naive_local().timestamp_millis() as f64 / 1000.0;
 
-        let projection_start_time = self.projection_start_time.as_secs_f64();
+        let projection_start_time = self.projection_start_time.naive_local().timestamp_millis() as f64 / 1000.0;
 
         let base_ctx = eval::EvalContext {
             x: 0.0,
             y: 0.0,
             index: 0.0,
-            count: (x_size * y_size - 1) as f64,
+            count: (x_size * y_size) as f64,
             fraction: 0.0,
             pi: std::f64::consts::PI,
             tau: std::f64::consts::TAU,
@@ -112,7 +105,7 @@ impl RenderWorkspace {
             ctx.index = f_index;
             ctx.x = -100.0 + (f_index % x_size)*(200.0/(x_size - 1.0));
             ctx.y = 100.0 - (200.0/(y_size - 1.0)) * f64::floor(f_index / x_size);
-            ctx.fraction = f_index / ctx.count;
+            ctx.fraction = f_index / (ctx.count - 1.0);
 
             let mut hash_map = AHashMap::new();
 
