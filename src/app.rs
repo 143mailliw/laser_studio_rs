@@ -1,5 +1,6 @@
 mod render;
 mod text;
+mod documentation;
 
 use crate::project;
 use eframe::egui;
@@ -71,7 +72,7 @@ impl eframe::App for LaserStudioApp {
             ui.label("Version 3.0");
             ui.separator();
             ui.label("Licensed under the Apache License, version 2.0.");
-            ui.label("© 2020-2022 william341.");
+            ui.label("© 2020-2022 william341");
         });
 
         let mut frame = egui::Frame::default();
@@ -200,7 +201,7 @@ impl eframe::App for LaserStudioApp {
                             .selectable_label(self.tab == Workspace::Render, "Render")
                             .clicked()
                         {
-                            render::on_switch_render(self);
+                            self.render.on_switch_render(&self.project);
                             self.tab = Workspace::Render;
                         }
                     }
@@ -208,8 +209,8 @@ impl eframe::App for LaserStudioApp {
             });
 
         match self.tab {
-            Workspace::Text => text::update_text_workspace(ctx, self),
-            Workspace::Render => render::update_render_workspace(ctx, self),
+            Workspace::Text => self.text.update_text_workspace(ctx, &mut self.project),
+            Workspace::Render => self.render.update_render_workspace(ctx, &mut self.project),
             _ => {
                 egui::SidePanel::left("about")
                     .resizable(false)

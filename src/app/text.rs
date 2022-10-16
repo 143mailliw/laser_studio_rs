@@ -24,146 +24,148 @@ impl Default for TextWorkspace {
     }
 }
 
-pub fn get_position_from_range(range: CCursorRange, string: String) -> (u64, u64) {
-    // we don't need the whole span info for the error message,
-    // but we keep it the whole time for things like error highlighting
-    let mut remaining_chars: u64 = range
+impl TextWorkspace {
+    pub fn get_position_from_range(range: CCursorRange, string: String) -> (u64, u64) {
+        // we don't need the whole span info for the error message,
+        // but we keep it the whole time for things like error highlighting
+        let mut remaining_chars: u64 = range
         .primary
         .index
         .try_into()
         .expect("text file is longer than 18446744073709551615 characters");
-    let mut line = 0;
+        let mut line = 0;
 
-    for cur_line in string.lines() {
-        line += 1;
+        for cur_line in string.lines() {
+            line += 1;
 
-        let len: u64 = cur_line.len().try_into().expect(
-            "if you encounter this error then something is *extremely* wrong with your computer",
-        );
+            let len: u64 = cur_line.len().try_into().expect(
+                    "if you encounter this error then something is *extremely* wrong with your computer",
+            );
 
-        if remaining_chars > len {
-            remaining_chars -= len + 1;
-        } else {
-            break;
+            if remaining_chars > len {
+                remaining_chars -= len + 1;
+            } else {
+                break;
+            }
         }
+
+        if remaining_chars == 0 {
+            line += 1;
+        }
+
+        return (line, remaining_chars);
     }
 
-    if remaining_chars == 0 {
-        line += 1;
-    }
+    pub fn update_text_workspace(&mut self, ctx: &egui::Context, project: &mut crate::project::Project) {
+        let mut frame = egui::Frame::default();
 
-    return (line, remaining_chars);
-}
+        frame.inner_margin = egui::style::Margin {
+            left: 0.0,
+            right: 0.0,
+            top: 0.0,
+            bottom: 0.0,
+        };
+        frame.fill = egui::Color32::from_gray(10);
 
-pub fn update_text_workspace(ctx: &egui::Context, app: &mut super::LaserStudioApp) {
-    let mut frame = egui::Frame::default();
+        let mut status_frame = egui::Frame::default();
 
-    frame.inner_margin = egui::style::Margin {
-        left: 0.0,
-        right: 0.0,
-        top: 0.0,
-        bottom: 0.0,
-    };
-    frame.fill = egui::Color32::from_gray(10);
+        status_frame.inner_margin = egui::style::Margin {
+            left: 7.0,
+            right: 7.0,
+            top: 5.0,
+            bottom: 0.0,
+        };
+        status_frame.fill = ctx.style().visuals.window_fill();
+        status_frame.stroke = ctx.style().visuals.window_stroke();
 
-    let mut status_frame = egui::Frame::default();
+        egui::TopBottomPanel::bottom("text_status")
+            .frame(status_frame)
+            .show(ctx, |ui| {
+                let pos =
+                    TextWorkspace::get_position_from_range(self.cursor, project.text_data.content.clone());
 
-    status_frame.inner_margin = egui::style::Margin {
-        left: 7.0,
-        right: 7.0,
-        top: 5.0,
-        bottom: 0.0,
-    };
-    status_frame.fill = ctx.style().visuals.window_fill();
-    status_frame.stroke = ctx.style().visuals.window_stroke();
+                ui.vertical(|ui| {
+                    ui.label(format!("Line {}, col {}", pos.0, pos.1));
+                })
+            });
 
-    egui::TopBottomPanel::bottom("text_status")
-        .frame(status_frame)
-        .show(ctx, |ui| {
-            let pos =
-                get_position_from_range(app.text.cursor, app.project.text_data.content.clone());
+        egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
+            let size_y = ui.available_size().y;
 
-            ui.vertical(|ui| {
-                ui.label(format!("Line {}, col {}", pos.0, pos.1));
-            })
-        });
+            egui::ScrollArea::vertical()
+                .max_height(size_y)
+                .show(ui, |ui| {
+                    ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                    ui.horizontal(|ui| {
+                        let mut num_frame = egui::Frame::default();
+                        num_frame.inner_margin = egui::style::Margin {
+                            left: 2.0,
+                            right: 0.0,
+                            top: 2.0,
+                            bottom: 0.0,
+                        };
+                        num_frame.fill = ctx.style().visuals.window_fill();
 
-    egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
-        let size_y = ui.available_size().y;
+                        num_frame.show(ui, |ui| {
+                            ui.vertical(|ui| {
+                                ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
+                                ui.set_min_width(40.0);
+                                ui.set_min_height(size_y);
 
-        egui::ScrollArea::vertical()
-            .max_height(size_y)
-            .show(ui, |ui| {
-                ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
-                ui.horizontal(|ui| {
-                    let mut num_frame = egui::Frame::default();
-                    num_frame.inner_margin = egui::style::Margin {
-                        left: 2.0,
-                        right: 0.0,
-                        top: 2.0,
-                        bottom: 0.0,
-                    };
-                    num_frame.fill = ctx.style().visuals.window_fill();
+                                let rows = self.rows.as_ref();
 
-                    num_frame.show(ui, |ui| {
-                        ui.vertical(|ui| {
-                            ui.spacing_mut().item_spacing = egui::vec2(0.0, 0.0);
-                            ui.set_min_width(40.0);
-                            ui.set_min_height(size_y);
+                                match rows {
+                                    Some(rows) => {
+                                        let mut cur_num = 1;
+                                        let mut last_had_new_line = true;
 
-                            let rows = app.text.rows.as_ref();
+                                        for row in rows {
+                                            if last_had_new_line {
+                                                ui.add(egui::Label::new(
+                                                    egui::RichText::new(cur_num.to_string())
+                                                        .size(14.0)
+                                                        .text_style(egui::TextStyle::Monospace),
+                                                ));
+                                            } else {
+                                                ui.add(egui::Label::new(
+                                                    egui::RichText::new(" ")
+                                                        .size(14.0)
+                                                        .text_style(egui::TextStyle::Monospace),
+                                                ));
+                                            }
 
-                            match rows {
-                                Some(rows) => {
-                                    let mut cur_num = 1;
-                                    let mut last_had_new_line = true;
-
-                                    for row in rows {
-                                        if last_had_new_line {
-                                            ui.add(egui::Label::new(
-                                                egui::RichText::new(cur_num.to_string())
-                                                    .size(14.0)
-                                                    .text_style(egui::TextStyle::Monospace),
-                                            ));
-                                        } else {
-                                            ui.add(egui::Label::new(
-                                                egui::RichText::new(" ")
-                                                    .size(14.0)
-                                                    .text_style(egui::TextStyle::Monospace),
-                                            ));
-                                        }
-
-                                        if row.ends_with_newline {
-                                            cur_num += 1;
-                                            last_had_new_line = true;
-                                        } else {
-                                            last_had_new_line = false;
+                                            if row.ends_with_newline {
+                                                cur_num += 1;
+                                                last_had_new_line = true;
+                                            } else {
+                                                last_had_new_line = false;
+                                            }
                                         }
                                     }
+                                    None => (),
+                                };
+                            })
+                        });
+
+                        ui.vertical(|ui| {
+                            ui.style_mut().wrap = Some(false);
+
+                            let response =
+                                egui::TextEdit::multiline(&mut project.text_data.content)
+                                    .code_editor()
+                                    .frame(false)
+                                    .desired_width(f32::INFINITY)
+                                    .show(ui);
+                            match response.state.ccursor_range() {
+                                Some(value) => {
+                                    self.cursor = value;
                                 }
                                 None => (),
-                            };
-                        })
-                    });
-
-                    ui.vertical(|ui| {
-                        ui.style_mut().wrap = Some(false);
-
-                        let response =
-                            egui::TextEdit::multiline(&mut app.project.text_data.content)
-                                .code_editor()
-                                .frame(false)
-                                .desired_width(f32::INFINITY)
-                                .show(ui);
-                        match response.state.ccursor_range() {
-                            Some(value) => {
-                                app.text.cursor = value;
                             }
-                            None => (),
-                        }
-                        app.text.rows = Some(response.galley.rows.clone());
+                            self.rows = Some(response.galley.rows.clone());
+                        })
                     })
                 })
-            })
-    });
+        });
+    }
 }

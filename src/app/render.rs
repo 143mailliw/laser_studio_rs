@@ -54,52 +54,53 @@ struct RenderedPoint {
     index: u16,
 }
 
-pub fn on_switch_render(app: &mut super::LaserStudioApp) {
-    match parser::parser().parse(app.project.text_data.content.clone()) {
-        Ok(value) => {
-            app.render.parser_errors = vec![];
-            app.render.parser_result = value;
-        }
-        Err(error) => {
-            app.render.parser_errors = error
+impl RenderWorkspace {
+    pub fn on_switch_render(&mut self, project: &crate::project::Project) {
+        match parser::parser().parse(project.text_data.content.clone()) {
+            Ok(value) => {
+                self.parser_errors = vec![];
+                self.parser_result = value;
+            }
+            Err(error) => {
+                self.parser_errors = error
                 .iter()
                 .map(|err| {
-                    parser::process_parser_error(err.clone(), app.project.text_data.content.clone())
+                    parser::process_parser_error(err.clone(), project.text_data.content.clone())
                 })
                 .collect();
-        }
-    };
+            }
+        };
 
-    app.render.projection_start_time = time::SystemTime::now()
+        self.projection_start_time = time::SystemTime::now()
         .duration_since(time::UNIX_EPOCH)
         .expect("time went backwards");
-}
+    }
 
-fn calculate_points(workspace: &mut RenderWorkspace, text: String, x_size: u16, y_size: u16) -> Vec<RenderedPoint> {
-    let time = time::SystemTime::now()
+    fn calculate_points(&mut self, text: String, x_size: u16, y_size: u16) -> Vec<RenderedPoint> {
+        let time = time::SystemTime::now()
         .duration_since(time::SystemTime::UNIX_EPOCH)
         .expect("time went backwards")
         .as_secs_f64();
 
-    let projection_start_time = workspace.projection_start_time.as_secs_f64();
+        let projection_start_time = self.projection_start_time.as_secs_f64();
 
-    let base_ctx = eval::EvalContext {
-        x: 0.0,
-        y: 0.0,
-        index: 0.0,
-        count: (x_size * y_size - 1) as f64,
-        fraction: 0.0,
-        pi: std::f64::consts::PI,
-        tau: std::f64::consts::TAU,
-        time,
-        projection_time: time - projection_start_time,
-        projection_start_time,
-    };
+        let base_ctx = eval::EvalContext {
+            x: 0.0,
+            y: 0.0,
+            index: 0.0,
+            count: (x_size * y_size - 1) as f64,
+            fraction: 0.0,
+            pi: std::f64::consts::PI,
+            tau: std::f64::consts::TAU,
+            time,
+            projection_time: time - projection_start_time,
+            projection_start_time,
+        };
 
-    workspace.eval_errors = vec![];
-    workspace.eval_variables = vec![];
+        self.eval_errors = vec![];
+        self.eval_variables = vec![];
 
-    let points: Vec<(AHashMap<String, f64>, Vec<errors::Error>, eval::EvalContext)> = (0..(x_size * y_size))
+        let points: Vec<(AHashMap<String, f64>, Vec<errors::Error>, eval::EvalContext)> = (0..(x_size * y_size))
         .into_par_iter()
         .map(|index| {
             let mut ctx = base_ctx.clone();
@@ -116,43 +117,43 @@ fn calculate_points(workspace: &mut RenderWorkspace, text: String, x_size: u16, 
             let mut hash_map = AHashMap::new();
 
             let result = eval::run(
-                workspace.parser_result.clone(),
-                text.clone(),
-                &mut hash_map,
-                ctx,
+                    self.parser_result.clone(),
+            text.clone(),
+            &mut hash_map,
+            ctx,
             );
             let error = result.1.clone();
             (hash_map, error, ctx)
         })
         .collect();
 
-    for tuple in points.clone() {
-        workspace.eval_errors.push(tuple.1.clone());
-        workspace.eval_variables.push(tuple.0.clone());
-    }
+        for tuple in points.clone() {
+            self.eval_errors.push(tuple.1.clone());
+            self.eval_variables.push(tuple.0.clone());
+        }
 
     let calculated_points = points
-        .par_iter()
-        .map(|(variables, _errors, ctx)| RenderedPoint {
-            x: *variables.get("x'").unwrap_or(&ctx.x),
-            y: *variables.get("y'").unwrap_or(&ctx.y),
-            h: *variables.get("h").unwrap_or(&0.0),
-            s: *variables.get("s").unwrap_or(&1.0),
-            v: *variables.get("v").unwrap_or(&1.0),
-            index: ctx.index as u16,
-        })
-        .collect();
+    .par_iter()
+    .map(|(variables, _errors, ctx)| RenderedPoint {
+        x: *variables.get("x'").unwrap_or(&ctx.x),
+        y: *variables.get("y'").unwrap_or(&ctx.y),
+        h: *variables.get("h").unwrap_or(&0.0),
+        s: *variables.get("s").unwrap_or(&1.0),
+        v: *variables.get("v").unwrap_or(&1.0),
+        index: ctx.index as u16,
+    })
+    .collect();
 
-    calculated_points
-}
+        calculated_points
+    }
 
-pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudioApp) {
-    let mut tools_frame = egui::Frame::default();
+    pub fn update_render_workspace(&mut self, ctx: &egui::Context, project: &mut crate::project::Project) {
+        let mut tools_frame = egui::Frame::default();
 
-    tools_frame.fill = ctx.style().visuals.window_fill();
-    tools_frame.stroke = ctx.style().visuals.window_stroke();
+        tools_frame.fill = ctx.style().visuals.window_fill();
+        tools_frame.stroke = ctx.style().visuals.window_stroke();
 
-    egui::TopBottomPanel::bottom("info_render_toolbar")
+        egui::TopBottomPanel::bottom("info_render_toolbar")
         .frame(tools_frame)
         .max_height(400.0)
         .resizable(true)
@@ -179,7 +180,7 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                 left: 5.0,
                 right: 5.0,
                 top: 5.0,
-                bottom: if app.render.tools_tab != ToolsTab::Hidden {
+                bottom: if self.tools_tab != ToolsTab::Hidden {
                     0.0
                 } else {
                     5.0
@@ -188,50 +189,50 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
 
             control_frame.show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    if ui.selectable_label(!app.render.eval_frozen, "▶").clicked() {
-                        app.render.eval_frozen = false;
+                    if ui.selectable_label(!self.eval_frozen, "▶").clicked() {
+                        self.eval_frozen = false;
                     }
 
-                    if ui.selectable_label(app.render.eval_frozen, "⬛").clicked() {
-                        app.render.eval_frozen = true;
+                    if ui.selectable_label(self.eval_frozen, "⬛").clicked() {
+                        self.eval_frozen = true;
                     }
 
                     ui.separator();
 
                     if ui
-                        .selectable_label(app.render.tools_tab == ToolsTab::Hidden, "Hide")
-                        .clicked()
+                    .selectable_label(self.tools_tab == ToolsTab::Hidden, "Hide")
+                    .clicked()
                     {
-                        app.render.tools_tab = ToolsTab::Hidden;
+                        self.tools_tab = ToolsTab::Hidden;
                     };
 
                     if ui
-                        .selectable_label(app.render.tools_tab == ToolsTab::Errors, "Errors")
-                        .clicked()
+                    .selectable_label(self.tools_tab == ToolsTab::Errors, "Errors")
+                    .clicked()
                     {
-                        app.render.tools_tab = ToolsTab::Errors;
+                        self.tools_tab = ToolsTab::Errors;
                     };
 
                     if ui
-                        .selectable_label(app.render.tools_tab == ToolsTab::Inspector, "Inspector")
-                        .clicked()
+                    .selectable_label(self.tools_tab == ToolsTab::Inspector, "Inspector")
+                    .clicked()
                     {
-                        app.render.tools_tab = ToolsTab::Inspector;
+                        self.tools_tab = ToolsTab::Inspector;
                     };
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::BOTTOM), |ui| {
-                        if app.render.tools_tab != ToolsTab::Hidden {
-                            let index_value = egui::DragValue::new(&mut app.render.tools_index_tb)
-                                .clamp_range(0..=399)
-                                .prefix("inspecting index: ");
+                        if self.tools_tab != ToolsTab::Hidden {
+                            let index_value = egui::DragValue::new(&mut self.tools_index_tb)
+                            .clamp_range(0..=399)
+                            .prefix("inspecting index: ");
 
                             ui.add(index_value);
 
                             ui.separator();
                         }
 
-                        let y_value = egui::DragValue::new(&mut app.project.text_data.size_y)
-                            .clamp_range(2..=20);
+                        let y_value = egui::DragValue::new(&mut project.text_data.size_y)
+                        .clamp_range(2..=20);
 
                         ui.add(y_value);
 
@@ -242,9 +243,9 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                             ui.monospace("by ");
                         });
 
-                        let x_value = egui::DragValue::new(&mut app.project.text_data.size_x)
-                            .clamp_range(2..=20);
-                        
+                        let x_value = egui::DragValue::new(&mut project.text_data.size_x)
+                        .clamp_range(2..=20);
+
                         ui.add(x_value);
 
                         frame.show(ui, |ui| {
@@ -254,162 +255,162 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
                 });
             });
 
-            if app.render.tools_tab == ToolsTab::Errors {
+            if self.tools_tab == ToolsTab::Errors {
                 ui.separator();
 
-                let index = app.render.tools_index_tb as usize;
+                let index = self.tools_index_tb as usize;
 
-                let eval_errors = app.render.eval_errors[index].clone();
-                let parser_errors = app.render.parser_errors.clone();
+                let eval_errors = self.eval_errors[index].clone();
+                let parser_errors = self.parser_errors.clone();
 
                 ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
                 ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
                 ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
 
                 TableBuilder::new(ui)
-                    .column(Size::exact(110.0))
-                    .column(Size::exact(100.0))
-                    .column(Size::remainder())
-                    .striped(true)
-                    .header(22.0, |mut header| {
-                        header.col(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.add_space(10.0);
-                                ui.label(egui::RichText::new("Type").strong());
-                            });
+                .column(Size::exact(110.0))
+                .column(Size::exact(100.0))
+                .column(Size::remainder())
+                .striped(true)
+                .header(22.0, |mut header| {
+                    header.col(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.add_space(10.0);
+                            ui.label(egui::RichText::new("Type").strong());
                         });
-                        header.col(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(egui::RichText::new("Location").strong());
-                            });
-                        });
-                        header.col(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(egui::RichText::new("Error").strong());
-                            });
-                        });
-                    })
-                    .body(|mut body| {
-                        for error in eval_errors {
-                            body.row(18.0, |mut row| {
-                                row.col(|ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.add_space(10.0);
-                                        ui.label("Runtime");
-                                    });
-                                });
-                                row.col(|ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.label(
-                                            error.line_number.to_string()
-                                                + &String::from(":")
-                                                + &error.col_number.to_string(),
-                                        );
-                                    });
-                                });
-                                row.col(|ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.label(error.reason.to_string());
-                                    });
-                                });
-                            });
-                        }
-                        for error in parser_errors {
-                            body.row(18.0, |mut row| {
-                                row.col(|ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.add_space(10.0);
-                                        ui.label("Parse");
-                                    });
-                                });
-                                row.col(|ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.label(
-                                            error.line_number.to_string()
-                                                + &String::from(":")
-                                                + &error.col_number.to_string(),
-                                        );
-                                    });
-                                });
-                                row.col(|ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.label(error.reason.to_string());
-                                    });
-                                });
-                            });
-                        }
                     });
+                    header.col(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("Location").strong());
+                        });
+                    });
+                    header.col(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("Error").strong());
+                        });
+                    });
+                })
+                .body(|mut body| {
+                    for error in eval_errors {
+                        body.row(18.0, |mut row| {
+                            row.col(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.add_space(10.0);
+                                    ui.label("Runtime");
+                                });
+                            });
+                            row.col(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                            error.line_number.to_string()
+                                            + &String::from(":")
+                                            + &error.col_number.to_string(),
+                                    );
+                                });
+                            });
+                            row.col(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(error.reason.to_string());
+                                });
+                            });
+                        });
+                    }
+                    for error in parser_errors {
+                        body.row(18.0, |mut row| {
+                            row.col(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.add_space(10.0);
+                                    ui.label("Parse");
+                                });
+                            });
+                            row.col(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                            error.line_number.to_string()
+                                            + &String::from(":")
+                                            + &error.col_number.to_string(),
+                                    );
+                                });
+                            });
+                            row.col(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(error.reason.to_string());
+                                });
+                            });
+                        });
+                    }
+                });
             }
 
-            if app.render.tools_tab == ToolsTab::Inspector {
+            if self.tools_tab == ToolsTab::Inspector {
                 ui.separator();
 
-                let index = app.render.tools_index_tb as usize;
+                let index = self.tools_index_tb as usize;
 
                 let eval_variables: AHashMap<String, f64> =
-                    app.render.eval_variables[index].clone();
+                self.eval_variables[index].clone();
 
                 ui.visuals_mut().widgets.active.rounding = egui::Rounding::none();
                 ui.visuals_mut().widgets.hovered.rounding = egui::Rounding::none();
                 ui.visuals_mut().widgets.inactive.rounding = egui::Rounding::none();
 
                 TableBuilder::new(ui)
-                    .column(Size::exact(160.0))
-                    .column(Size::remainder().at_least(150.0))
-                    .striped(true)
-                    .header(22.0, |mut header| {
-                        header.col(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.add_space(10.0);
-                                ui.label(egui::RichText::new("Name").strong());
-                            });
+                .column(Size::exact(160.0))
+                .column(Size::remainder().at_least(150.0))
+                .striped(true)
+                .header(22.0, |mut header| {
+                    header.col(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.add_space(10.0);
+                            ui.label(egui::RichText::new("Name").strong());
                         });
-                        header.col(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.label(egui::RichText::new("Value").strong());
-                            });
-                        });
-                    })
-                    .body(|mut body| {
-                        let mut sorted: Vec<_> = eval_variables.iter().collect();
-                        sorted.sort_by_key(|a| a.0);
-
-                        for variable in sorted {
-                            body.row(18.0, |mut row| {
-                                row.col(|ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.add_space(10.0);
-                                        ui.monospace(variable.0);
-                                    });
-                                });
-                                row.col(|ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.monospace(variable.1.to_string());
-                                    });
-                                });
-                            })
-                        }
                     });
+                    header.col(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new("Value").strong());
+                        });
+                    });
+                })
+                .body(|mut body| {
+                    let mut sorted: Vec<_> = eval_variables.iter().collect();
+                    sorted.sort_by_key(|a| a.0);
+
+                    for variable in sorted {
+                        body.row(18.0, |mut row| {
+                            row.col(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.add_space(10.0);
+                                    ui.monospace(variable.0);
+                                });
+                            });
+                            row.col(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.monospace(variable.1.to_string());
+                                });
+                            });
+                        })
+                    }
+                });
             }
         });
 
-    if !app.render.eval_frozen {
-        app.render.eval_result =
-            calculate_points(&mut app.render, app.project.text_data.content.clone(), app.project.text_data.size_x as u16, app.project.text_data.size_y as u16);
-    }
+        if !self.eval_frozen {
+            self.eval_result =
+            self.calculate_points(project.text_data.content.clone(), project.text_data.size_x as u16, project.text_data.size_y as u16);
+        }
 
-    let mut frame = egui::Frame::default();
+        let mut frame = egui::Frame::default();
 
-    frame.inner_margin = egui::style::Margin {
-        left: 0.0,
-        right: 0.0,
-        top: 0.0,
-        bottom: 0.0,
-    };
-    frame.fill = ctx.style().visuals.window_fill();
+        frame.inner_margin = egui::style::Margin {
+            left: 0.0,
+            right: 0.0,
+            top: 0.0,
+            bottom: 0.0,
+        };
+        frame.fill = ctx.style().visuals.window_fill();
 
-    egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
-        let plot = plot::Plot::new("render_plot")
+        egui::CentralPanel::default().frame(frame).show(ctx, |ui| {
+            let plot = plot::Plot::new("render_plot")
             .show_axes([false, false])
             .data_aspect(1.0)
             .include_x(150.0)
@@ -417,27 +418,28 @@ pub fn update_render_workspace(ctx: &egui::Context, app: &mut super::LaserStudio
             .include_y(150.0)
             .include_y(-150.0);
 
-        plot.show(ui, |plot_ui| {
-            for point in app.render.eval_result.iter() {
-                if point.v != 0.0 {
-                    let plot_point = plot::Points::new(vec![[point.x, point.y]])
+            plot.show(ui, |plot_ui| {
+                for point in self.eval_result.iter() {
+                    if point.v != 0.0 {
+                        let plot_point = plot::Points::new(vec![[point.x, point.y]])
                         .filled(true)
                         .radius(3.0)
                         .color(egui::color::Hsva::new(
-                            (point.h % 360.0 / 360.0) as f32,
-                            point.s as f32,
-                            point.v as f32,
-                            1.0,
+                                (point.h % 360.0 / 360.0) as f32,
+                        point.s as f32,
+                        point.v as f32,
+                        1.0,
                         ))
                         .name(format!("index: {}", point.index));
 
-                    plot_ui.points(plot_point);
+                        plot_ui.points(plot_point);
+                    }
                 }
+            });
+
+            if !self.eval_frozen {
+                ctx.request_repaint();
             }
         });
-
-        if !app.render.eval_frozen {
-            ctx.request_repaint();
-        }
-    });
+    }
 }
