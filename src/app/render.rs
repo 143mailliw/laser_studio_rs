@@ -24,6 +24,9 @@ pub struct RenderWorkspace {
     tools_tab: ToolsTab,
     tools_index_tb: u16,
     pub eval_frozen: bool,
+    encountered_eval_error: bool,
+    encountered_parser_error: bool,
+    eval_error_indexes: Vec<u16>,
 }
 
 impl Default for RenderWorkspace {
@@ -38,6 +41,9 @@ impl Default for RenderWorkspace {
             tools_tab: ToolsTab::Hidden,
             tools_index_tb: 0,
             eval_frozen: false,
+            encountered_eval_error: false,
+            encountered_parser_error: false,
+            eval_error_indexes: vec![],
         }
     }
 }
@@ -54,10 +60,18 @@ struct RenderedPoint {
 
 impl RenderWorkspace {
     pub fn on_switch_render(&mut self, project: &crate::project::Project) {
+        self.eval_frozen = false;
+        self.encountered_eval_error = false;
+        self.encountered_parser_error = false;
+        self.eval_error_indexes = vec![];
+        self.eval_errors = vec![];
+        self.parser_errors = vec![];
+
         match parser::parser().parse(project.text_data.content.clone()) {
             Ok(value) => {
                 self.parser_errors = vec![];
                 self.parser_result = value;
+                self.calculate_points(project.text_data.content.clone(), 20, 20);
             }
             Err(error) => {
                 self.parser_errors = error
@@ -66,6 +80,11 @@ impl RenderWorkspace {
                     parser::process_parser_error(err.clone(), project.text_data.content.clone())
                 })
                 .collect();
+
+                // calculate a set of points so that we don't panic
+                self.calculate_points("".to_string(), 20, 20);
+                self.encountered_parser_error = true;
+                self.tools_tab = ToolsTab::Errors;
             }
         };
 
@@ -73,6 +92,9 @@ impl RenderWorkspace {
     }
 
     fn calculate_points(&mut self, text: String, x_size: u16, y_size: u16) -> Vec<RenderedPoint> {
+        self.encountered_eval_error = false;
+        self.eval_error_indexes = vec![]; 
+
         let time = Local::now().naive_local().timestamp_millis() as f64 / 1000.0;
 
         let projection_start_time = self.projection_start_time.naive_local().timestamp_millis() as f64 / 1000.0;
@@ -93,7 +115,7 @@ impl RenderWorkspace {
         self.eval_errors = vec![];
         self.eval_variables = vec![];
 
-        let points: Vec<(AHashMap<String, f64>, Vec<errors::Error>, eval::EvalContext)> = (0..(x_size * y_size))
+        let points: Vec<(AHashMap<String, f64>, Vec<errors::Error>, eval::EvalContext, u16)> = (0..(x_size * y_size))
         .into_par_iter()
         .map(|index| {
             let mut ctx = base_ctx.clone();
@@ -116,24 +138,32 @@ impl RenderWorkspace {
             ctx,
             );
             let error = result.1.clone();
-            (hash_map, error, ctx)
+            (hash_map, error, ctx, index)
         })
         .collect();
 
         for tuple in points.clone() {
+            if tuple.1.len() > 0 {
+                self.encountered_eval_error = true;
+                self.eval_error_indexes.push(tuple.3);
+                self.eval_frozen = true;
+                self.tools_index_tb = tuple.3;
+                self.tools_tab = ToolsTab::Errors;
+            }
+
             self.eval_errors.push(tuple.1.clone());
             self.eval_variables.push(tuple.0.clone());
         }
 
     let calculated_points = points
     .par_iter()
-    .map(|(variables, _errors, ctx)| RenderedPoint {
+    .map(|(variables, _errors, _ctx, index)| RenderedPoint {
         x: *variables.get("x'").unwrap_or(&0.0),
         y: *variables.get("y'").unwrap_or(&0.0),
         h: *variables.get("h").unwrap_or(&0.0),
         s: *variables.get("s").unwrap_or(&0.0),
         v: *variables.get("v").unwrap_or(&1.0),
-        index: ctx.index as u16,
+        index: *index,
     })
     .collect();
 
@@ -146,9 +176,45 @@ impl RenderWorkspace {
         tools_frame.fill = ctx.style().visuals.window_fill();
         tools_frame.stroke = ctx.style().visuals.window_stroke();
 
+        let mut frame = egui::Frame::default();
+
+        frame.fill = egui::Color32::DARK_RED;
+        frame.stroke = egui::Stroke::new(1.0, egui::Color32::RED);
+        frame.inner_margin = egui::style::Margin {
+            left: 5.0,
+            right: 5.0,
+            top: 2.0,
+            bottom: 5.0
+        };
+        frame.outer_margin = egui::style::Margin::same(10.0);
+        frame.rounding = frame.rounding.at_least(1.0);
+
+        if self.encountered_parser_error {
+            egui::containers::Area::new("Parser Error")
+                .fixed_pos(egui::pos2(0.0, 30.0))
+                .show(ctx, |ui| {
+                    frame.show(ui, |ui| {
+                        ui.label(egui::RichText::new("A parser error occured; see the errors displayed below.").color(egui::Color32::WHITE))
+                    })
+                });
+        } else if self.encountered_eval_error {
+            egui::containers::Area::new("Eval Error")
+                .fixed_pos(egui::pos2(0.0, 30.0))
+                .show(ctx, |ui| {
+                    frame.show(ui, |ui| {
+                        let index_text = self.eval_error_indexes.iter()
+                            .map(|index| index.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ");
+
+                        ui.label(egui::RichText::new("Execution stopped - an evaluation error occured in the following index(es): ".to_string() + &index_text).color(egui::Color32::WHITE))
+                    });
+                    ui.add_space(10.0);
+                });
+        }
+
         egui::TopBottomPanel::bottom("info_render_toolbar")
         .frame(tools_frame)
-        .max_height(400.0)
         .resizable(true)
         .show(ctx, |ui| {
             ui.spacing_mut().button_padding.x = 5.0;
@@ -199,8 +265,16 @@ impl RenderWorkspace {
                         self.tools_tab = ToolsTab::Hidden;
                     };
 
+                    let text = if self.encountered_parser_error {
+                        egui::RichText::new("！ Errors").color(egui::Color32::RED)
+                    } else if self.encountered_eval_error {
+                        egui::RichText::new("⚠ Errors").color(egui::Color32::YELLOW)
+                    } else {
+                        egui::RichText::new("Errors")
+                    };
+
                     if ui
-                    .selectable_label(self.tools_tab == ToolsTab::Errors, "Errors")
+                    .selectable_label(self.tools_tab == ToolsTab::Errors, text)
                     .clicked()
                     {
                         self.tools_tab = ToolsTab::Errors;
@@ -333,6 +407,7 @@ impl RenderWorkspace {
                         });
                     }
                 });
+                //ui.allocate_space(ui.available_size());
             }
 
             if self.tools_tab == ToolsTab::Inspector {
@@ -383,11 +458,12 @@ impl RenderWorkspace {
                             });
                         })
                     }
-                });
+                }); 
+                //ui.allocate_space(ui.available_size());
             }
         });
 
-        if !self.eval_frozen {
+        if !self.eval_frozen && !self.encountered_parser_error {
             self.eval_result =
             self.calculate_points(project.text_data.content.clone(), project.text_data.size_x as u16, project.text_data.size_y as u16);
         }
@@ -411,27 +487,29 @@ impl RenderWorkspace {
             .include_y(150.0)
             .include_y(-150.0);
 
-            plot.show(ui, |plot_ui| {
-                for point in self.eval_result.iter() {
-                    if point.v != 0.0 {
-                        let plot_point = plot::Points::new(vec![[point.x, point.y]])
-                        .filled(true)
-                        .radius(3.0)
-                        .color(egui::color::Hsva::new(
-                                (point.h % 360.0 / 360.0) as f32,
-                        point.s as f32,
-                        point.v as f32,
-                        1.0,
-                        ))
-                        .name(format!("index: {}", point.index));
+            if !self.encountered_parser_error {
+                plot.show(ui, |plot_ui| {
+                    for point in self.eval_result.iter() {
+                        if point.v != 0.0 {
+                            let plot_point = plot::Points::new(vec![[point.x, point.y]])
+                            .filled(true)
+                            .radius(3.0)
+                            .color(egui::color::Hsva::new(
+                                    (point.h % 360.0 / 360.0) as f32,
+                            point.s as f32,
+                            point.v as f32,
+                            1.0,
+                            ))
+                            .name(format!("index: {}", point.index));
 
-                        plot_ui.points(plot_point);
+                            plot_ui.points(plot_point);
+                        }
                     }
-                }
-            });
+                });
 
-            if !self.eval_frozen {
-                ctx.request_repaint();
+                if !self.eval_frozen {
+                    ctx.request_repaint();
+                }
             }
         });
     }
