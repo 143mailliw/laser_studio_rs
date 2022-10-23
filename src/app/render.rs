@@ -128,10 +128,10 @@ impl RenderWorkspace {
     let calculated_points = points
     .par_iter()
     .map(|(variables, _errors, ctx)| RenderedPoint {
-        x: *variables.get("x'").unwrap_or(&ctx.x),
-        y: *variables.get("y'").unwrap_or(&ctx.y),
+        x: *variables.get("x'").unwrap_or(&0.0),
+        y: *variables.get("y'").unwrap_or(&0.0),
         h: *variables.get("h").unwrap_or(&0.0),
-        s: *variables.get("s").unwrap_or(&1.0),
+        s: *variables.get("s").unwrap_or(&0.0),
         v: *variables.get("v").unwrap_or(&1.0),
         index: ctx.index as u16,
     })
