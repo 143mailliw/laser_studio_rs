@@ -127,19 +127,19 @@ impl eframe::App for LaserStudioApp {
                         }
                     });
 
-                    if self.tab != Workspace::Home {
-                        ui.menu_button("Edit", |ui| {
-                            LaserStudioApp::menu_button_styling(ui);
+                    // if self.tab != Workspace::Home {
+                    //     ui.menu_button("Edit", |ui| {
+                    //         LaserStudioApp::menu_button_styling(ui);
 
-                            if ui.button("Undo").clicked() {}
-                            if ui.button("Redo").clicked() {}
-                            if ui.button("History").clicked() {}
-                            ui.separator();
-                            if ui.button("Find/Replace").clicked() {}
-                            ui.separator();
-                            if ui.button("Preferences").clicked() {}
-                        });
-                    }
+                    //         if ui.button("Undo").clicked() {}
+                    //         if ui.button("Redo").clicked() {}
+                    //         if ui.button("History").clicked() {}
+                    //         ui.separator();
+                    //         if ui.button("Find/Replace").clicked() {}
+                    //         ui.separator();
+                    //         if ui.button("Preferences").clicked() {}
+                    //     });
+                    // }
 
                     if self.tab != Workspace::Home {
                         ui.menu_button("Run", |ui| {
@@ -160,7 +160,7 @@ impl eframe::App for LaserStudioApp {
                     ui.menu_button("Help", |ui| {
                         LaserStudioApp::menu_button_styling(ui);
 
-                        if ui.button("Documentation").clicked() {}
+                        // if ui.button("Documentation").clicked() {}
 
                         if ui.button("About Laser Studio").clicked() {
                             self.show_about_window = true;
@@ -232,7 +232,7 @@ impl eframe::App for LaserStudioApp {
                             self.open_dialog();
                         }
                     });
-                    ui.heading("Recent Projects");
+                    // ui.heading("Recent Projects");
                 });
             }
         }

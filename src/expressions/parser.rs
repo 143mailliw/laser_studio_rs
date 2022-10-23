@@ -41,6 +41,9 @@ pub enum Expr {
 
     // Function Call
     Call(String, Vec<Spanned<Arc<Expr>>>),
+
+    // Error
+    Error
 }
 
 #[derive(Debug, Clone)]
@@ -82,7 +85,13 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
             .delimited_by(just('('), just(')'))
             .padded()
             .map(|expr: Spanned<Expr>| Expr::Group((Arc::new(expr.0), expr.1)))
-            .map_with_span(|expr, span: Span| (expr, span));
+            .map_with_span(|expr, span: Span| (expr, span))
+            .recover_with(nested_delimiters(
+                '(',
+                ')',
+                [('[', ']'), ('{', '}')],
+                |span| (Expr::Error, span)
+            ));
 
         let call = ident
             .then(
@@ -309,7 +318,7 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
         .ignored();
 
     variable
-        .recover_with(skip_then_retry_until([]))
+        .recover_with(skip_then_retry_until([';']))
         .padded_by(comment.repeated())
         .padded()
         .repeated()

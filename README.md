@@ -12,6 +12,7 @@ Laser Studio is an IDE (or, at least, it will be when it's finished) for Tower U
 
 - Documentation viewer
 - Full debugger
+- Redo, find & replace
 - Syntax & error highlighting
 - Auto completion
 - Editor tooltips
