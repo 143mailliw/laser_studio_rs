@@ -43,7 +43,7 @@ pub enum Expr {
     Call(String, Vec<Spanned<Arc<Expr>>>),
 
     // Error
-    Error
+    Error,
 }
 
 #[derive(Debug, Clone)]
@@ -90,7 +90,7 @@ pub fn parser() -> impl Parser<char, Vec<Assignment>, Error = Simple<char>> {
                 '(',
                 ')',
                 [('[', ']'), ('{', '}')],
-                |span| (Expr::Error, span)
+                |span| (Expr::Error, span),
             ));
 
         let call = ident

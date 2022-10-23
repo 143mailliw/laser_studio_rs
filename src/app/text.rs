@@ -29,10 +29,10 @@ impl TextWorkspace {
         // we don't need the whole span info for the error message,
         // but we keep it the whole time for things like error highlighting
         let mut remaining_chars: u64 = range
-        .primary
-        .index
-        .try_into()
-        .expect("text file is longer than 18446744073709551615 characters");
+            .primary
+            .index
+            .try_into()
+            .expect("text file is longer than 18446744073709551615 characters");
         let mut line = 0;
 
         for cur_line in string.lines() {
@@ -56,7 +56,11 @@ impl TextWorkspace {
         return (line, remaining_chars);
     }
 
-    pub fn update_text_workspace(&mut self, ctx: &egui::Context, project: &mut crate::project::Project) {
+    pub fn update_text_workspace(
+        &mut self,
+        ctx: &egui::Context,
+        project: &mut crate::project::Project,
+    ) {
         let mut frame = egui::Frame::default();
 
         frame.inner_margin = egui::style::Margin {
@@ -81,8 +85,10 @@ impl TextWorkspace {
         egui::TopBottomPanel::bottom("text_status")
             .frame(status_frame)
             .show(ctx, |ui| {
-                let pos =
-                    TextWorkspace::get_position_from_range(self.cursor, project.text_data.content.clone());
+                let pos = TextWorkspace::get_position_from_range(
+                    self.cursor,
+                    project.text_data.content.clone(),
+                );
 
                 ui.vertical(|ui| {
                     ui.label(format!("Line {}, col {}", pos.0, pos.1));

@@ -207,7 +207,7 @@ fn eval(
                     || eval(&b, variables, ctx)? >= 1.0)
                     as u64 as f64),
             }
-        },
+        }
         Expr::Variable(name) => {
             let result = match name.as_str() {
                 "x" => Some(ctx.x),
@@ -235,8 +235,12 @@ fn eval(
                     id: 3,
                 }),
             }
-        },
-        Expr::Error => Err(RawEvalError { error: "E255: Evaluator given invalid parser output.".to_string(), span: span.clone(), id: 255 })
+        }
+        Expr::Error => Err(RawEvalError {
+            error: "E255: Evaluator given invalid parser output.".to_string(),
+            span: span.clone(),
+            id: 255,
+        }),
     }
 }
 

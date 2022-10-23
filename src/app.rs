@@ -1,6 +1,6 @@
+mod documentation;
 mod render;
 mod text;
-mod documentation;
 
 use crate::project;
 use eframe::egui;

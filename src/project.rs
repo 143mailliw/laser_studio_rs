@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct TextData {
     pub content: String,
     pub size_x: u8,
-    pub size_y: u8
+    pub size_y: u8,
 }
 
 impl Default for TextData {
@@ -15,7 +15,7 @@ impl Default for TextData {
                 "
             .to_string(),
             size_y: 20,
-            size_x: 20
+            size_x: 20,
         }
     }
 }
