@@ -17,7 +17,6 @@ Laser Studio is an IDE (or, at least, it will be when it's finished) for Tower U
 - Auto completion
 - Editor tooltips
 - Graphical editor (lets you draw pixel art and export it as an expression)
-- Savable projects
 
 ## FAQ
 ### Why run on the CPU? Why not the GPU?
@@ -35,5 +34,14 @@ It's been tested to be up to 15x faster. It depends on how many cores your CPU h
 Laser Studio is signifigantly more strict about what you can get away with. Check the errors, which can be shown by clicking the Errors button in the Render tab.
 Laser Studio tries to prevent undefined behavior occuring, so things you can get away with in Tower Unite like missing arguments, parentheses, and semi-colons don't work in in Laser Studio.
 
+Here's a list of some of the problems you might run into from Laser Studio's stricter parser:
+- Variable assignments must end in a semi-colon.
+- Functions cannot be run with more or less arguments than expected.
+- Un-matched parentheses will always result in an error.
+- You cannot use a variable before it has been assigned to.
+
 ### Why doesn't my expression work? I'm not getting any errors, but everything's in the wrong place!
-It *seems* like Tower Unite's FP math & rounding is signifigantly off. Try to make it work in Laser Studio first, and if you can't get it to work in both then make a Github issue.
+If you found errors you had to correct before your expression ran in Laser Studio, your expression may have relied in quirks in Tower Unite's laser projection.
+Try running the corrected expression in Tower Unite, to see if it behaves the same way. If it does, you'll have to fix your expression.
+
+However, if your *error-free* code causes inaccuracies between Laser Studio and Tower Unite, please submit a Github issue - that shouldn't happen.
