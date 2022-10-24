@@ -16,7 +16,10 @@ pub struct DocumentationWindow {
 impl Default for DocumentationWindow {
     fn default() -> Self {
         let available_pages = vec![
-            DocumentationEntry::Page("Home".into(), "# Unfinished".into()),
+            DocumentationEntry::Page(
+                "Introduction".into(),
+                include_str!("../../docs/introduction.md").into(),
+            ),
             DocumentationEntry::Group(
                 "Expressions".into(),
                 vec![
