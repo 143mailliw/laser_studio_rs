@@ -1,4 +1,5 @@
 use eframe::egui;
+use egui_commonmark::*;
 
 #[derive(PartialEq, Clone)]
 enum DocumentationEntry {
@@ -51,11 +52,36 @@ impl DocumentationWindow {
             .open(open)
             .resizable(true)
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
+                let mut side_frame = egui::Frame::default();
+
+                side_frame.inner_margin.right = 50.0;
+
+                egui::SidePanel::left("documentation_left")
+                    .frame(side_frame)
+                    .show_inside(ui, |ui| {
                         self.build_tree(ui, self.available_pages.clone());
-                    })
-                })
+                    });
+
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::default())
+                    .show_inside(ui, |ui| {
+                        match &self.page {
+                            DocumentationEntry::Page(_, content) => {
+                                egui::ScrollArea::vertical()
+                                    .max_height(f32::INFINITY)
+                                    .max_width(f32::INFINITY)
+                                    .show(ui, |ui| {
+                                        let mut cache = CommonMarkCache::default();
+                                        CommonMarkViewer::new("viewer")
+                                            .show(ui, &mut cache, &content);
+                                    });
+                            }
+                            _ => {
+                                ui.heading("Please select a page.");
+                            }
+                        };
+                    });
+                ui.allocate_space(ui.available_size());
             });
     }
 
