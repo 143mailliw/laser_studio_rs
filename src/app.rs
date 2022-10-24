@@ -31,6 +31,7 @@ pub struct LaserStudioApp {
     project: project::Project,
     pub text: text::TextWorkspace,
     render: render::RenderWorkspace,
+    documentation: documentation::DocumentationWindow,
     project_rx: mpsc::Receiver<FileDialogSelection>,
     project_tx: mpsc::Sender<FileDialogSelection>,
     show_about_window: bool,
@@ -47,6 +48,7 @@ impl Default for LaserStudioApp {
             project: project::Project::default(),
             text: text::TextWorkspace::default(),
             render: render::RenderWorkspace::default(),
+            documentation: documentation::DocumentationWindow::default(),
             project_rx: rx,
             project_tx: tx,
             show_about_window: false,
@@ -63,17 +65,19 @@ impl eframe::App for LaserStudioApp {
         self.handle_keybinds(ctx);
 
         // handle about window
-        let about_window = egui::Window::new("About Laser Studio")
+        egui::Window::new("About Laser Studio")
             .open(&mut self.show_about_window)
-            .resizable(false);
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.heading("Laser Studio");
+                ui.label("Version 3.0");
+                ui.separator();
+                ui.label("Licensed under the Apache License, version 2.0.");
+                ui.label("© 2020-2022 william341");
+            });
 
-        about_window.show(ctx, |ui| {
-            ui.heading("Laser Studio");
-            ui.label("Version 3.0");
-            ui.separator();
-            ui.label("Licensed under the Apache License, version 2.0.");
-            ui.label("© 2020-2022 william341");
-        });
+        self.documentation
+            .update(ctx, &mut self.show_documentation_window);
 
         let mut frame = egui::Frame::default();
 
@@ -160,7 +164,9 @@ impl eframe::App for LaserStudioApp {
                     ui.menu_button("Help", |ui| {
                         LaserStudioApp::menu_button_styling(ui);
 
-                        // if ui.button("Documentation").clicked() {}
+                        if ui.button("Documentation").clicked() {
+                            self.show_documentation_window = true;
+                        }
 
                         if ui.button("About Laser Studio").clicked() {
                             self.show_about_window = true;
