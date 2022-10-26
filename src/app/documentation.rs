@@ -35,7 +35,10 @@ impl Default for DocumentationWindow {
                         "Functions".into(),
                         include_str!("../../docs/expressions/functions.md").into(),
                     ),
-                    DocumentationEntry::Page("Operators".into(), "# Unfinished".into()),
+                    DocumentationEntry::Page(
+                        "Operators".into(),
+                        include_str!("../../docs/expressions/operators.md").into(),
+                    ),
                 ],
             ),
             DocumentationEntry::Group(
