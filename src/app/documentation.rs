@@ -27,7 +27,10 @@ impl Default for DocumentationWindow {
                         "Inputs".into(),
                         include_str!("../../docs/expressions/inputs.md").into(),
                     ),
-                    DocumentationEntry::Page("Outputs".into(), "# Unfinished".into()),
+                    DocumentationEntry::Page(
+                        "Outputs".into(),
+                        include_str!("../../docs/expressions/outputs.md").into(),
+                    ),
                     DocumentationEntry::Page(
                         "Functions".into(),
                         include_str!("../../docs/expressions/functions.md").into(),
