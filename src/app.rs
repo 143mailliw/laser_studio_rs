@@ -166,10 +166,12 @@ impl eframe::App for LaserStudioApp {
 
                         if ui.button("Documentation").clicked() {
                             self.show_documentation_window = true;
+                            ui.close_menu();
                         }
 
                         if ui.button("About Laser Studio").clicked() {
                             self.show_about_window = true;
+                            ui.close_menu();
                         }
                     });
 

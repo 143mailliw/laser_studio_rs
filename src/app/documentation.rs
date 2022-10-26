@@ -28,7 +28,10 @@ impl Default for DocumentationWindow {
                         include_str!("../../docs/expressions/inputs.md").into(),
                     ),
                     DocumentationEntry::Page("Outputs".into(), "# Unfinished".into()),
-                    DocumentationEntry::Page("Functions".into(), "# Unfinished".into()),
+                    DocumentationEntry::Page(
+                        "Functions".into(),
+                        include_str!("../../docs/expressions/functions.md").into(),
+                    ),
                     DocumentationEntry::Page("Operators".into(), "# Unfinished".into()),
                 ],
             ),
@@ -54,6 +57,8 @@ impl DocumentationWindow {
         egui::Window::new("Documentation")
             .open(open)
             .resizable(true)
+            .default_width(600.0)
+            .default_height(400.0)
             .show(ctx, |ui| {
                 let mut side_frame = egui::Frame::default();
 
