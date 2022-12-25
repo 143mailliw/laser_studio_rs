@@ -5,3 +5,4 @@
 
 **/*.rs.bk
 .fleet
+.DS_Store
