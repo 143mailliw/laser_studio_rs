@@ -73,7 +73,7 @@ impl eframe::App for LaserStudioApp {
                 ui.label("Version 3.0");
                 ui.separator();
                 ui.label("Licensed under the Apache License, version 2.0.");
-                ui.label("© 2020-2022 william341");
+                ui.label("© 2020-2022 William Whittaker");
             });
 
         self.documentation
